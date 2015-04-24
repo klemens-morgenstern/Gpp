@@ -58,6 +58,9 @@ void File::AddRecord(const Record &r )
 	case DFAState::Id:
 		DFAStates.push_back(DFAState::FromRecord(r));
 		break;
+	case LALRState::Id:
+		LALRStates.push_back(LALRState::FromRecord(r));
+		break;
 	}
 }
 
@@ -104,6 +107,9 @@ std::wostream& operator<<(std::wostream& s, const File& f)
 		s << sy << endl;
 
 	for (auto &d : f.DFAStates)
+		s << d << endl;
+
+	for (auto &d : f.LALRStates)
 		s << d << endl;
 
 	return s;

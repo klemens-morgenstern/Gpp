@@ -13,10 +13,11 @@
 namespace Egt
 {
 
+struct Record;
 
 struct LALRState
 {
-	static constexpr char Byte = 'L';
+	static constexpr char Id = 'L';
 
 	enum ActionType_t : Integer
 	{
@@ -36,7 +37,13 @@ struct LALRState
 	Integer Index;
 
 	Range<Action_t> Actions;
+
+	static LALRState FromRecord(const Record &r);
+
 };
+
+std::wostream& operator<<(std::wostream& s, const LALRState& p);
+
 
 }
 #endif /* EGT_LALRSTATE_H_ */

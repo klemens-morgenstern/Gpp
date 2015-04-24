@@ -14,7 +14,7 @@
 
 namespace Egt
 {
-
+struct Record;
 
 struct InitialStates
 {

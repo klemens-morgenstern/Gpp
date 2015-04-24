@@ -9,7 +9,8 @@
 #define EGT_CHARACTERSETTABLE_H_
 
 #include "types.h"
-#include <iostream>
+#include <ostream>
+#include <utility>
 
 namespace Egt
 {

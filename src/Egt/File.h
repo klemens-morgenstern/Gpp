@@ -18,7 +18,8 @@
 #include "Production.h"
 #include "InitialStates.h"
 #include "DFAState.h"
-#include <iostream>
+#include "LALRState.h"
+#include <ostream>
 
 namespace Egt {
 
@@ -43,6 +44,7 @@ struct File
 	InitialStates InitialStates;
 
 	Range<DFAState> DFAStates;
+	Range<LALRState> LALRStates;
 
 	void AddProperty(const Property &prop);
 	void AddRecord(const Record &r);

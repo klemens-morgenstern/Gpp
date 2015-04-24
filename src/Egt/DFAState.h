@@ -14,6 +14,7 @@
 namespace Egt
 {
 
+struct Record;
 
 struct DFAState
 {
