@@ -9,6 +9,7 @@
 #include <type_traits>
 
 #include "Reader/GetVis.h"
+#include <cassert>
 
 using namespace std;
 namespace Egt
@@ -67,12 +68,21 @@ void File::AddRecord(const Record &r )
 
 File readRawFile(const RawFile & rf)
 {
+	using namespace std;
+
 	File f;
 
 	f.GoldVersion = rf.Name;
 
 	for (auto &rec : rf.Records)
 		f.AddRecord(rec);
+
+	assert(f.SymbolTable.size()			== f.TableCounts.SymbolTable );
+	assert(f.CharacterSetTables.size()	== f.TableCounts.SetTable    );
+	assert(f.Productions.size()			== f.TableCounts.RuleTable   );
+	//assert(f.DFAStates.size()			== f.TableCounts.DFATable    ); //??
+	//assert(f.LALRStates.size()			== f.TableCounts.LALRTable   ); //??
+	assert(f.GroupRecords.size()		== f.TableCounts.GroupTable  );
 
 	return f;
 }
