@@ -33,16 +33,12 @@ struct Symbol
 		Error		= 7,
 	};
 
-	Integer Index;
 	String Name;
 	Type_t Type;
 
-	static Symbol FromRecord(const Record &r);
+	static Indexed<Symbol> FromRecord(const Record &r);
 
 };
-
-std::wostream& operator<<(std::wostream& s, const Symbol& f);
-
 
 }
 

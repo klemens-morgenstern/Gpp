@@ -36,15 +36,15 @@ struct File
 	String GeneratedDate 	= L"";
 
 	TableCounts TableCounts;
-	Range<CharacterSetTable> CharacterSetTables;
-	Range<Symbol> SymbolTable;
-	Range<GroupRecord> GroupRecords;
-	Range<Production> Productions;
+	Map<CharacterSetTable> CharacterSetTables;
+	Map<Symbol> SymbolTable;
+	Map<GroupRecord> GroupRecords;
+	Map<Production> Productions;
 
 	InitialStates InitialStates;
 
-	Range<DFAState> DFAStates;
-	Range<LALRState> LALRStates;
+	Map<DFAState> DFAStates;
+	Map<LALRState> LALRStates;
 
 	void AddProperty(const Property &prop);
 	void AddRecord(const Record &r);
@@ -53,7 +53,6 @@ struct File
 
 File readRawFile(const RawFile & rf);
 
-std::wostream& operator<<(std::wostream& s, const File& f);
 
 } /* namespace Egt */
 

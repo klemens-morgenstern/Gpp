@@ -18,15 +18,13 @@ struct Production
 {
 	static constexpr Byte Id = 'R';
 
-	Integer Index;
 	Integer HeadIndex;
 
 	Range<Integer> Symbols;
 
-	static Production FromRecord(const Record &r);
+	static Indexed<Production> FromRecord(const Record &r);
 
 };
-std::wostream& operator<<(std::wostream& s, const Production& f);
 
 }
 

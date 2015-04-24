@@ -26,18 +26,16 @@ struct DFAState
 		Integer TargetIndex;
 	};
 
-	Integer Index;
 	Boolean AcceptState;
 	Integer AcceptIndex;
 
 	Range<Edge> Edges;
 
-	static DFAState FromRecord(const Record &r);
+	static Indexed<DFAState> FromRecord(const Record &r);
 
 
 };
 
-std::wostream& operator<<(std::wostream& s, const DFAState& p);
 
 }
 

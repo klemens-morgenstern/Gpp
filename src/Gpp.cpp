@@ -30,7 +30,7 @@ int main()
 	File f = readRawFile(LoadFile("cte.egt"));
 	//auto rw = LoadFile("cte.egt");
 
-	wcout << f << endl;
+
 	//cout << rw.Records.size();
 
 	return 0;

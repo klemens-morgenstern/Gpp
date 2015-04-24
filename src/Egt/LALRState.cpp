@@ -12,11 +12,11 @@
 
 namespace Egt
 {
-LALRState LALRState::FromRecord(const Record &r)
+Indexed<LALRState> LALRState::FromRecord(const Record &r)
 {
 	LALRState p;
 
-	p.Index 		= r.Entries.at(1).get<Integer>();
+	auto idx = r.Entries.at(1).get<Integer>();
 
 	for (auto i = 3u; i<r.Entries.size(); i+=4)
 	{
@@ -29,24 +29,7 @@ LALRState LALRState::FromRecord(const Record &r)
 
 	}
 
-	return p;
-}
-
-std::wostream& operator<<(std::wostream& s, const LALRState& p)
-{
-	using namespace std;
-	s << "==================== LALR State ====================" << endl;
-	s << "\tIndex:       " << p.Index << endl;
-	s << "\tActions:     " << endl;
-
-	for (auto & e : p.Actions)
-	{
-		s << "\t\t{ SymbolIndex: " << e.SymbolIndex <<
-			 "; Action: " << e.Action <<
-			 "; TargetIndex: " << e.TargetIndex <<
-			 "}" << endl;
-	}
-	return s;
+	return {idx, p};
 }
 
 

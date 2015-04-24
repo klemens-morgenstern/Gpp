@@ -10,7 +10,6 @@
 
 #include "types.h"
 #include <ostream>
-#include <utility>
 
 namespace Egt
 {
@@ -21,13 +20,12 @@ struct CharacterSetTable
 {
 	static constexpr Byte Id = 'c';
 
-	Integer Index;
 	Integer UnicodePlane;
 	//Integer RangeCount;
 
 	Range<Integer> Characters;
 
-	static CharacterSetTable FromRecord(const Record &r);
+	static Indexed<CharacterSetTable> FromRecord(const Record &r);
 
 };
 

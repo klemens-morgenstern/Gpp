@@ -11,11 +11,11 @@
 
 namespace Egt
 {
-DFAState DFAState::FromRecord(const Record &r)
+Indexed<DFAState> DFAState::FromRecord(const Record &r)
 {
 	DFAState p;
 
-	p.Index 		= r.Entries.at(1).get<Integer>();
+	auto idx 		= r.Entries.at(1).get<Integer>();
 	p.AcceptState	= r.Entries.at(2).get<Boolean>();
 	p.AcceptIndex	= r.Entries.at(3).get<Integer>();
 
@@ -28,24 +28,9 @@ DFAState DFAState::FromRecord(const Record &r)
 
 	}
 
-	return p;
+	return {idx, p};
 }
 
-std::wostream& operator<<(std::wostream& s, const DFAState& p)
-{
-	using namespace std;
-	s << "==================== DFA State ====================" << endl;
-	s << "\tIndex:       " << p.Index << endl;
-	s << "\tAcceptState: " << p.AcceptState << endl;
-	s << "\tAcceptIndex: " << p.AcceptIndex << endl;
-	s << "\tEdges:     " << endl;
-
-	for (auto & e : p.Edges)
-	{
-		s << "\t\t{ CharSet: " << e.CharSetIndex << "; Target: " << e.TargetIndex << "}" << endl;
-	}
-	return s;
-}
 
 
 }

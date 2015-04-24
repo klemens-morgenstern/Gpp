@@ -31,7 +31,6 @@ struct GroupRecord
 		Closed 	= 1, ///<	The ending symbol will be consumed.
 	};
 
-	Integer Index;
 	String Name;
 	Integer ContainerIndex;
 	Integer StartIndex;
@@ -41,11 +40,8 @@ struct GroupRecord
 
 	Range<Integer> GroupIndex;
 
-	static GroupRecord FromRecord(const Record &r);
+	static Indexed<GroupRecord> FromRecord(const Record &r);
 };
-
-std::wostream& operator<<(std::wostream& s, const GroupRecord& f);
-
 
 }
 

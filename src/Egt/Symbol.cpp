@@ -12,24 +12,18 @@ using namespace std;
 
 namespace Egt
 {
-Symbol Symbol::FromRecord(const Record &r)
+Indexed<Symbol> Symbol::FromRecord(const Record &r)
 {
 	Symbol cs;
 
-	cs.Index 	= r.Entries.at(1).get<Integer>();
+	auto Idx 	= r.Entries.at(1).get<Integer>();
 	cs.Name 	= r.Entries.at(2).get<String>();
 	cs.Type 	= static_cast<Symbol::Type_t>(r.Entries.at(3).get<Integer>());
 
-	return cs;
+	return {Idx, cs};
 }
 
-std::wostream& operator<<(std::wostream& s, const Symbol& f)
-{
-	s << "\tIndex: " << f.Index << "\tName: " <<  f.Name << "\tType: " << static_cast<Integer>(f.Type);
 
-	return s;
-
-}
 }
 
 

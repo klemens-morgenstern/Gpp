@@ -34,15 +34,13 @@ struct LALRState
 		Integer TargetIndex;
 	};
 
-	Integer Index;
 
 	Range<Action_t> Actions;
 
-	static LALRState FromRecord(const Record &r);
+	static Indexed<LALRState> FromRecord(const Record &r);
 
 };
 
-std::wostream& operator<<(std::wostream& s, const LALRState& p);
 
 
 }

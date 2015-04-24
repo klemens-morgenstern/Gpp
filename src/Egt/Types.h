@@ -13,6 +13,8 @@
 #include <string>
 #include <boost/blank.hpp>
 #include <istream>
+#include <map>
+
 
 namespace Egt
 {
@@ -25,6 +27,10 @@ using Boolean	= bool;
 using Blank 	= boost::blank;
 
 
+//template<typename T> using Map  	= std::map <Integer, T>;
+
+template<typename T> struct Map : std::map<Integer, T> {};
+template<typename T> using Indexed 	= std::pair<Integer, T>;
 
 
 inline String ReadString(std::istream &ss)

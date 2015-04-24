@@ -41,25 +41,25 @@ void File::AddRecord(const Record &r )
 		this->TableCounts = TableCounts::FromRecord(r);
 		break;
 	case CharacterSetTable::Id:
-		this->CharacterSetTables.push_back(CharacterSetTable::FromRecord(r));
+		this->CharacterSetTables.emplace(CharacterSetTable::FromRecord(r));
 		break;
 	case Symbol::Id:
-		this->SymbolTable.push_back(Symbol::FromRecord(r));
+		this->SymbolTable.emplace(Symbol::FromRecord(r));
 		break;
 	case GroupRecord::Id:
-		GroupRecords.push_back(GroupRecord::FromRecord(r));
+		GroupRecords.emplace(GroupRecord::FromRecord(r));
 		break;
 	case Production::Id:
-		Productions.push_back(Production::FromRecord(r));
+		Productions.emplace(Production::FromRecord(r));
 		break;
 	case InitialStates::Id:
 		InitialStates = InitialStates::FromRecord(r);
 		break;
 	case DFAState::Id:
-		DFAStates.push_back(DFAState::FromRecord(r));
+		DFAStates.emplace(DFAState::FromRecord(r));
 		break;
 	case LALRState::Id:
-		LALRStates.push_back(LALRState::FromRecord(r));
+		LALRStates.emplace(LALRState::FromRecord(r));
 		break;
 	}
 }
@@ -77,43 +77,7 @@ File readRawFile(const RawFile & rf)
 	return f;
 }
 
-std::wostream& operator<<(std::wostream& s, const File& f)
-{
-	s << f.Name << endl;
-	s << "==================== Properties ====================" << endl;
-	s << "\tGoldVersion 	 : " << f.GoldVersion 	   	<< endl;
-	s << "\tName			 : " << f.Name			   	<< endl;
-	s << "\tVersion			 : " << f.Version		   	<< endl;
-	s << "\tAuthor			 : " << f.Author			<< endl;
-	s << "\tAbout			 : " << f.About			   	<< endl;
-	s << "\tCharacterSet	 : " << f.CharacterSet	   	<< endl;
-	s << "\tCharacterMapping : " << f.CharacterMapping  << endl;
-	s << "\tGeneratedBy		 : " << f.GeneratedBy	   	<< endl;
-	s << "\tGeneratedDate 	 : " << f.GeneratedDate 	<< endl;
 
-	s << endl << f.TableCounts << endl;
-	for (auto &cst :  f.CharacterSetTables)
-		s << endl << cst << endl;
-
-	s << "==================== Symbol Table ====================" << endl;
-	for (auto &sy : f.SymbolTable)
-		s << sy << endl;
-
-	for (auto gc : f.GroupRecords)
-		s << gc << endl;
-
-	s << "==================== Production ====================" << endl;
-	for (auto &sy : f.Productions)
-		s << sy << endl;
-
-	for (auto &d : f.DFAStates)
-		s << d << endl;
-
-	for (auto &d : f.LALRStates)
-		s << d << endl;
-
-	return s;
-}
 
 
 } /* namespace Egt */
