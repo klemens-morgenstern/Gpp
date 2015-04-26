@@ -51,6 +51,8 @@ struct File
 
 };
 
+File readRawFile(const std::string & rf);
+
 File readRawFile(const RawFile & rf);
 
 

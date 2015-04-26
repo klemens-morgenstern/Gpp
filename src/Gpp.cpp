@@ -20,6 +20,10 @@
 #include "Egt/Reader/RawFile.h"
 #include "Egt/File.h"
 
+#include "Cpp/MakeLexer.h"
+
+#include "Tar/DFA.h"
+
 using namespace std;
 using namespace Egt;
 
@@ -27,11 +31,11 @@ using namespace Egt;
 int main()
 {
 
-	File f = readRawFile(LoadFile("cte.egt"));
-	//auto rw = LoadFile("cte.egt");
+	File f = readRawFile("cte.egt");
 
+	Gpp::makeLexer(f, "Lexer", "CteParser", "out/");
 
-	//cout << rw.Records.size();
+	Gpp::Dfa::test();
 
 	return 0;
 }

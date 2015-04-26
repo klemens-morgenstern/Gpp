@@ -66,6 +66,7 @@ void File::AddRecord(const Record &r )
 }
 
 
+File readRawFile(const std::string & rf) {return readRawFile(LoadFile(rf));}
 File readRawFile(const RawFile & rf)
 {
 	using namespace std;
