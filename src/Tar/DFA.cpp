@@ -38,12 +38,6 @@ std::wstring to_wstring(S s)
 	}
 }
 
-#define DFA_GETFIRST(First, Zeugs...) First
-
-#define DFA_MAKE_EDGE(StateId, Chars...) DFAEdge<StateId, decltype(DFA_GETFIRST(Chars...)), Chars...>
-
-#define DFA_MAKE_ACCEPT_STATE(Id, Symbol, Edges...) \
-template<> struct StateDef< Id > {using state = State<true, decltype(Symbol), Symbol, Edges... >;};
 
 template<> struct StateDef<0> {	using state = State<false,  S, s1, DFAEdge<1, wchar_t, L'A', L'a', L'B', L'b'>, DFAEdge<2, wchar_t, L' '>>;};
 template<> struct StateDef<1> {	using state = State<true,  S, s2, DFAEdge<1, wchar_t, L'A', L'a', L'B', L'b'>>;};

@@ -21,6 +21,9 @@ using Dfa::value_tuple;
 using Dfa::for_all;
 using Dfa::contains;
 
+template<typename T>
+using Stack = std::stack<T, std::vector<T>>;
+
 enum Action_Enum
 {
 	Shift = 1, ///<This action indicates the symbol is to be shifted. The Target field will contain the index of the state in the LALR State table that the parsing engine will advance to.
@@ -29,6 +32,8 @@ enum Action_Enum
 	Accept = 4,///<When the parser encounters the Accept action for a given symbol, the source text is accepted as correct and complete. In this case, the Target field is not needed and should be ignored.
 	Error = 5, ///<Rule not recognized
 };
+
+
 
 template<typename Action, typename First, typename ... Args>
 bool for_first(Action action, std::tuple<First, Args...> tpl)
@@ -96,7 +101,7 @@ struct AcceptAction
 };
 
 template<typename State, typename Iterator, typename Token = typename Iterator::value_type>
-bool execute_sm(std::stack<Token>& stack, Iterator &itr, const Iterator &end);
+bool execute_sm(Stack<Token>& stack, Iterator &itr, const Iterator &end);
 
 template<typename ... Actions_>
 struct State
@@ -107,7 +112,7 @@ struct State
 struct AcceptTrow {};
 
 template<typename Action, typename Iterator, typename Token = typename Iterator::value_type> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Reduce>, std::stack<Token>& stack, Iterator &itr, const Iterator &end)
+bool execute_state(std::integral_constant<Action_Enum, Reduce>, Stack<Token>& stack, Iterator &itr, const Iterator &end)
 {
 	stack.push(*itr);
 
@@ -117,7 +122,7 @@ bool execute_state(std::integral_constant<Action_Enum, Reduce>, std::stack<Token
 }
 
 template<typename Action, typename Iterator, typename Token = typename Iterator::value_type> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Shift>, std::stack<Token>& stack, Iterator &itr, const Iterator &end)
+bool execute_state(std::integral_constant<Action_Enum, Shift>, Stack<Token>& stack, Iterator &itr, const Iterator &end)
 {
 	stack.push(*itr);
 	execute_sm<typename Action::State>(stack, itr, end);
@@ -126,13 +131,13 @@ bool execute_state(std::integral_constant<Action_Enum, Shift>, std::stack<Token>
 }
 
 template<typename Action, typename Iterator, typename Token = typename Iterator::value_type> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Goto>, std::stack<Token>& stack, Iterator &itr, const Iterator &end)
+bool execute_state(std::integral_constant<Action_Enum, Goto>, Stack<Token>& stack, Iterator &itr, const Iterator &end)
 {
 	return false;
 }
 
 template<typename Action, typename Iterator, typename Token = typename Iterator::value_type> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Accept>, std::stack<Token>& stack, Iterator &itr, const Iterator &end)
+bool execute_state(std::integral_constant<Action_Enum, Accept>, Stack<Token>& stack, Iterator &itr, const Iterator &end)
 {
 	throw AcceptTrow();
 }
@@ -140,7 +145,7 @@ bool execute_state(std::integral_constant<Action_Enum, Accept>, std::stack<Token
 
 
 template<typename State, typename Iterator, typename Token = typename Iterator::value_type>
-bool execute_sm(std::stack<Token>& stack, Iterator &itr, const Iterator &end)
+bool execute_sm(Stack<Token>& stack, Iterator &itr, const Iterator &end)
 {
 	bool repeat = false;
 	bool found = false;
@@ -170,7 +175,7 @@ bool execute_sm(std::stack<Token>& stack, Iterator &itr, const Iterator &end)
 template<typename Token, typename StartingState>
 class StateMachine
 {
-	std::stack<Token> _stack;
+	Stack<Token> _stack{[]{std::vector<Token> v; v.reserve(1000); return v;}};
 public:
 	using Start = StartingState;
 	template<typename Iterator>
@@ -181,7 +186,7 @@ public:
 			using Type = typename Start::ActionType;
 			execute_sm<Start>(Type(), itr, end);
 		}
-		catch (AcceptTrow)
+		catch (AcceptTrow&)
 		{
 			return true;
 		}

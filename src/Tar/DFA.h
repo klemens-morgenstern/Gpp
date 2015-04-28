@@ -151,15 +151,16 @@ struct Sm
 
 };
 
-template<typename Buffer, typename Symbol>
+template<typename Buffer, typename Symbol_>
 struct Token
 {
 	using iterator = typename Buffer::const_iterator;
 private:
 	iterator _begin;
 	iterator _end;
-	Symbol _id;
+	Symbol_ _id;
 public:
+	using Symbol = Symbol_;
 	using StringType = std::basic_string<typename Buffer::value_type>;
 	Symbol Id() const {return _id;}
 	StringType ToString() const {return StringType(_begin, _end);}
@@ -238,7 +239,15 @@ public:
 
 };
 
-void test();
+#define DFA_GETFIRST(First, Zeugs...) First
+#define DFA_MAKE_EDGE(StateId, Chars...) DFAEdge<StateId, decltype(DFA_GETFIRST(Chars...)), Chars...>
+
+#define DFA_MAKE_NOACCEPT_STATE(Id, SymbolType, Edges...) \
+template<> struct StateDef< Id > {using state = State<true, Symbol, SymbolType(), Edges... >;};
+
+#define DFA_MAKE_ACCEPT_STATE(Id, Symbol, Edges...) \
+template<> struct StateDef< Id > {using state = State<true, decltype(Symbol), Symbol, Edges... >;};
+
 
 }
 } /* namespace Egt */

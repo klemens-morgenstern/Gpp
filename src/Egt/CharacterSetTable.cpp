@@ -8,6 +8,8 @@
 #include "Reader/Record.h"
 #include "CharacterSetTable.h"
 
+#include <iostream>
+
 using namespace std;
 
 namespace Egt
@@ -22,8 +24,9 @@ Indexed<CharacterSetTable> CharacterSetTable::FromRecord(const Record &r)
 
 	auto cnt = r.Entries.at(3).get<Integer>();
 
-	for (auto i = 0; i<cnt; i++)
+	for (auto i = 0; i< cnt*2; i++)
 		cs.Characters.push_back(r.Entries.at(5+i).get<Integer>());
+
 	return {Idx, cs};
 }
 

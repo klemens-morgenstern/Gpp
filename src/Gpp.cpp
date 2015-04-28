@@ -35,7 +35,7 @@ int main()
 
 	Gpp::makeLexer(f, "Lexer", "CteParser", "out/");
 
-	Gpp::Dfa::test();
+//	Gpp::Dfa::test();
 
 	return 0;
 }
