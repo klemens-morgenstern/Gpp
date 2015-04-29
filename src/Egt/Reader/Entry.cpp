@@ -76,9 +76,8 @@ Entry ReadEntry(std::istream& str)
 	case 'I': //Integer
 	{
 		str.read(&c, 1);
-		char buf[2];
-		str.read(buf, 2);
-		std::uint16_t val = buf[0] | (buf[1] << 1);
+		std::uint16_t val;
+		str.read(reinterpret_cast<char*>(&val), 2);
 		return Entry(val);
 	}
 	case 'S':

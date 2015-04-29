@@ -23,7 +23,17 @@ struct CharacterSetTable
 	Integer UnicodePlane;
 	//Integer RangeCount;
 
+	struct CharRange
+	{
+		Integer begin;
+		Integer end;
+		CharRange(Integer beg, Integer end) : begin(beg), end(end) {};
+		CharRange(const CharRange&) = default;
+		CharRange() = default;
+	};
+
 	Range<Integer> Characters;
+	Range<CharRange> CharRanges;
 
 	static Indexed<CharacterSetTable> FromRecord(const Record &r);
 

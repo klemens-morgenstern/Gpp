@@ -11,6 +11,7 @@
 #include <tuple>
 #include <stdexcept>
 #include <vector>
+#include <iostream>
 
 namespace Gpp
 {
@@ -69,14 +70,59 @@ template<typename T, typename U>
 bool contains(T  value, value_tuple<U> tpl) {return false;};
 
 
+//new version.
+
+template<typename T, typename First, typename ... Args>
+bool contains(T value, std::tuple<First, Args...> tpl)
+{
+	//if (First::Matches(value))
+	if (match(value, First()))
+		return true;
+	else
+		return contains(value, std::tuple<Args...>());
+};
+
+template<typename T, typename First>
+bool contains(T  value, std::tuple<First> tpl)
+{
+	return match(value, First());
+};
+
+template<typename T>
+bool contains(T  value, std::tuple<> tpl) {return false;};
+
+
+
 template<int I>
 struct StateDef {}; //used to define a DFA State
 
+template<typename CharType, CharType Char_>
+struct Char
+{
+};
 
-template<int State_Id, typename CharType, CharType  ... Char_>
+template<typename CharType, CharType Begin, CharType End>
+struct CharRange
+{
+
+};
+
+template<typename In, typename CharType, CharType Char_>
+bool match(In in, Char<CharType, Char_>)
+{
+	return in == Char_;
+}
+
+template<typename In, typename CharType, CharType Begin, CharType End>
+bool match(In in, CharRange<CharType, Begin, End>)
+{
+	return (in >= Begin) && (in <= End);
+}
+
+template<int State_Id, typename ... Chars_>
 struct DFAEdge
 {
-	using Chars = value_tuple<CharType, Char_...>;
+	using Chars = std::tuple<Chars_...>;
 	using State = typename StateDef<State_Id>::state;
 
 };
@@ -95,6 +141,7 @@ using DFAEmpty = State<false, Symbol, 0>;
 
 template<typename ...T>
 using DFATree = std::tuple<T...>;
+
 
 template<typename State, typename Iterator>
 auto execute_sm(Iterator &begin, const Iterator &end) -> std::pair<bool, typename State::Symbol>
@@ -120,11 +167,11 @@ auto execute_sm(Iterator &begin, const Iterator &end) -> std::pair<bool, typenam
 				Iterator itr = begin + 1;
 				auto s = execute_sm<typename Edge::State>(itr, end);
 
-				if (s.first && (itr > longest))
+				if (s.first && (itr >= longest))
 				{
 					sym = s.second;
 					longest = itr;
-					accept = true;
+					accept = s.first;
 				}
 			}
 		}, typename State::Edges_t());
@@ -176,6 +223,7 @@ public:
 template<typename Buffer, typename Start_, bool SendEof = false, typename Start_::Symbol Eof = typename Start_::Symbol()>
 class Lexer
 {
+public:
 	const Buffer _buffer;
 public:
 	using Symbol = typename Start_::Symbol;
@@ -203,6 +251,7 @@ public:
 		{
 			auto beg = itr;
 			auto p = execute_sm<Start>(beg, end);
+
 			match = p.first && (beg != itr);
 			if (match)
 			{
@@ -240,13 +289,23 @@ public:
 };
 
 #define DFA_GETFIRST(First, Zeugs...) First
-#define DFA_MAKE_EDGE(StateId, Chars...) DFAEdge<StateId, decltype(DFA_GETFIRST(Chars...)), Chars...>
+#define DFA_MAKE_EDGE(StateId, Chars...) DFAEdge<StateId, Chars>
 
 #define DFA_MAKE_NOACCEPT_STATE(Id, SymbolType, Edges...) \
-template<> struct StateDef< Id > {using state = State<true, Symbol, SymbolType(), Edges... >;};
+template<> struct StateDef< Id > {using state = State<false, SymbolType, static_cast<SymbolType>(0), Edges >;};
 
 #define DFA_MAKE_ACCEPT_STATE(Id, Symbol, Edges...) \
-template<> struct StateDef< Id > {using state = State<true, decltype(Symbol), Symbol, Edges... >;};
+template<> struct StateDef< Id > {using state = State<true, decltype(Symbol), Symbol, Edges >;};
+
+///state without edge
+#define DFA_MAKE_END_STATE(Id, Symbol)\
+template<> struct StateDef< Id > {using state = State<true, decltype(Symbol), Symbol>;};
+
+#define DFA_MAKE_NOEND_STATE(Id, Symbol)\
+template<> struct StateDef< Id > {using state = State<true, decltype(Symbol), Symbol>;};
+
+#define DFA_CHAR(Value) Char<decltype(Value), Value >
+#define DFA_CHAR_RANGE(Lower, Upper) CharRange<decltype(Lower), Lower, Upper >
 
 
 }

@@ -81,8 +81,8 @@ File readRawFile(const RawFile & rf)
 	assert(f.SymbolTable.size()			== f.TableCounts.SymbolTable );
 	assert(f.CharacterSetTables.size()	== f.TableCounts.SetTable    );
 	assert(f.Productions.size()			== f.TableCounts.RuleTable   );
-	//assert(f.DFAStates.size()			== f.TableCounts.DFATable    ); //??
-	//assert(f.LALRStates.size()			== f.TableCounts.LALRTable   ); //??
+	assert(f.DFAStates.size()			== f.TableCounts.DFATable    );
+	assert(f.LALRStates.size()			== f.TableCounts.LALRTable   );
 	assert(f.GroupRecords.size()		== f.TableCounts.GroupTable  );
 
 	return f;

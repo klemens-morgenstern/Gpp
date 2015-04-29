@@ -43,6 +43,15 @@ Indexed<GroupRecord> GroupRecord::FromRecord(const Record &r)
 	for (auto i = 0; i<cnt; i++)
 		gc.GroupIndex.push_back(r.Entries.at(10+i).get<Integer>());
 
+	wcout << "Groupname: " <<  gc.Name << endl;
+
+	wcout << "SI: " <<  gc.StartIndex << endl;
+	wcout << "EI: " <<  gc.EndIndex << endl;
+	wcout << "CI: " <<  gc.ContainerIndex << endl;
+	wcout << "AM: " <<  static_cast<Integer>(gc.AdvanceMode) << endl;
+	wcout << "EM: " <<  static_cast<Integer>(gc.EndingMode)  << endl;
+
+
 	return {idx, gc};
 }
 
