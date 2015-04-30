@@ -57,6 +57,7 @@ void File::AddRecord(const Record &r )
 		InitialStates = InitialStates::FromRecord(r);
 		break;
 	case DFAState::Id:
+
 		DFAStates.emplace(DFAState::FromRecord(r));
 		break;
 	case LALRState::Id:
@@ -84,6 +85,22 @@ File readRawFile(const RawFile & rf)
 	assert(f.DFAStates.size()			== f.TableCounts.DFATable    );
 	assert(f.LALRStates.size()			== f.TableCounts.LALRTable   );
 	assert(f.GroupRecords.size()		== f.TableCounts.GroupTable  );
+
+	for (auto &g : f.GroupRecords)
+	{
+		cout << "Group: "
+			 << static_cast<int>(g.second.AdvanceMode) << endl;
+		cout << g.second.ContainerIndex << endl;
+		cout << static_cast<int>(g.second.EndIndex) << endl;
+		cout << g.second.EndingMode << endl;
+
+		wcout << g.second.Name << endl;
+
+		for (auto &s : g.second.GroupIndex)
+			cout << s << ", ";
+
+		cout << endl << endl;
+	}
 
 	return f;
 }

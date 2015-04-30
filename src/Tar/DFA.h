@@ -136,12 +136,108 @@ struct State
 	using Edges_t = std::tuple<Edges...>;
 };
 
-template<typename Symbol = int>
-using DFAEmpty = State<false, Symbol, 0>;
+template<typename Symbol_, Symbol_ ContainerSymbol_, Symbol_ StartSymbol_, Symbol_ EndSymbol_, bool AdvanceByChar_, bool ConsumeEnd_, typename ... Nested_>
+struct Group
+{
+	using Symbol = Symbol_;
+	constexpr static Symbol ContainerSymbol = ContainerSymbol_;
+	constexpr static Symbol StartSymbol = StartSymbol_;
+	constexpr static Symbol EndSymbol	= EndSymbol_;
+	constexpr static bool AdvanceByChar = AdvanceByChar_;
+	constexpr static bool ConsumeEnd 	= ConsumeEnd_;
+	using Nested = std::tuple<Nested_...>;
+};
 
-template<typename ...T>
-using DFATree = std::tuple<T...>;
 
+template<typename State, typename Iterator>
+auto execute_sm(Iterator &begin, const Iterator &end) -> std::pair<bool, typename State::Symbol>;
+
+
+template<typename Iterator, typename Symbol_, Symbol_ ContainerSymbol_, Symbol_ StartSymbol_, Symbol_ EndSymbol_, bool AdvanceByChar, bool ConsumeEnd, typename ... Nested_>
+auto execute_group(Iterator &begin, const Iterator &end, Group<Symbol_, ContainerSymbol_, StartSymbol_, EndSymbol_, AdvanceByChar, ConsumeEnd, Nested_...>) -> std::pair<bool, Symbol_>
+{
+	std::cout << "ERROR" << std::endl;
+}
+
+template<typename Start, typename Iterator, typename Symbol_, Symbol_ ContainerSymbol_, Symbol_ StartSymbol_, Symbol_ EndSymbol_, bool ConsumeEnd, typename ... Nested_>
+auto execute_group(Iterator &begin, const Iterator &end, Group<Symbol_, ContainerSymbol_, StartSymbol_, EndSymbol_, true /*AdvanceByChar*/, ConsumeEnd, Nested_...>) -> std::pair<bool, Symbol_>
+{
+	auto itr = begin;
+
+	while (itr != end)
+	{
+		auto it_sm = itr;
+		auto p = execute_sm<Start>(it_sm, end);
+
+
+		if (p.first && (p.second == EndSymbol_))
+		{
+			if (ConsumeEnd)
+				begin = it_sm;
+			else
+				begin = itr;
+
+			return {true, ContainerSymbol_};
+		}
+		else
+			itr++;
+	}
+
+	return {false, Symbol_()};
+}
+
+template<int idx>
+struct GroupDef {/*using group = NoGroup<Symbol_>;*/};
+
+template<bool = false>
+struct GroupList
+{
+	using Groups = std::tuple<>;
+};
+
+template<int ... DefIds>
+struct GroupListHelper
+{
+	using Tuple = std::tuple<typename GroupDef<DefIds>::Group...>;
+};
+
+
+//template<typename StartState, typename Iterator, typename Symbol_>
+//auto execute_group(Iterator &begin, const Iterator &end, NoGroup<Symbol_>) -> std::pair<bool, Symbol_>
+//{
+//	return {false, Symbol_()};
+//}
+
+template<typename StartState, typename Iterator, typename Symbol_, bool dummy = false>
+auto look_for_group(Iterator &begin, const Iterator &end, Symbol_ sym) -> std::pair<bool, Symbol_>
+{
+	auto longest = begin;
+
+	bool found = false;
+	Symbol_ found_sym = Symbol_();
+
+	for_all([&](auto grp)
+			{
+				auto itr = begin;
+				using Group = decltype(grp);
+
+				if (sym == Group::StartSymbol)
+				{
+					auto gp = execute_group<StartState>(itr, end, grp);
+					if (gp.first && (itr > longest))
+					{
+						found = true;
+						found_sym = gp.second;
+						longest = itr;
+					}
+				}
+			}, typename GroupList<dummy>::Groups());
+
+	if (found)
+		begin = longest;
+
+	return {found, found_sym};
+}
 
 template<typename State, typename Iterator>
 auto execute_sm(Iterator &begin, const Iterator &end) -> std::pair<bool, typename State::Symbol>
@@ -255,7 +351,16 @@ public:
 			match = p.first && (beg != itr);
 			if (match)
 			{
-				func(Token(itr, beg, p.second));
+				//ok, got one. Now: is the mother maybe a groupbegin?
+				auto it = itr;
+				auto gp = look_for_group<Start>(it, end, p.second);
+				if (gp.first) //found a group
+				{
+					beg = it;
+					func(Token(itr, beg, gp.second));
+				}
+				else
+					func(Token(itr, beg, p.second));
 				itr = beg;
 			}
 		}
@@ -306,6 +411,20 @@ template<> struct StateDef< Id > {using state = State<true, decltype(Symbol), Sy
 
 #define DFA_CHAR(Value) Char<decltype(Value), Value >
 #define DFA_CHAR_RANGE(Lower, Upper) CharRange<decltype(Lower), Lower, Upper >
+
+
+#define DFA_MAKE_GROUP_NESTED(Idx, ContainerSymbol,StartSymbol, EndSymbol, AdvanceByChar, ConsumeEnd, Nested...) \
+template<> \
+struct GroupDef<Idx> {using Group = Group<decltype(ContainerSymbol), ContainerSymbol, StartSymbol, EndSymbol, AdvanceByChar, ConsumeEnd, Nested >;};
+
+#define DFA_MAKE_GROUP(Idx, ContainerSymbol, StartSymbol, EndSymbol, AdvanceByChar, ConsumeEnd) \
+template<> \
+struct GroupDef<Idx> {using Group = Group<decltype(ContainerSymbol), ContainerSymbol, StartSymbol, EndSymbol, AdvanceByChar, ConsumeEnd>;};
+
+#define DFA_MAKE_GROUPLIST(Ids...) \
+template<> \
+struct GroupList<false> {using Groups = typename GroupListHelper<Ids>::Tuple;};
+
 
 
 }

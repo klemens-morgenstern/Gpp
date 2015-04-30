@@ -193,6 +193,60 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
 
     lexerdef << endl;
 
+    //now add the groupdefs
+
+    for (auto &grp  : f.GroupRecords)
+    {
+    	if (grp.second.GroupIndex.size())
+    	{
+    		auto sym = [&](Egt::Integer symIndex)
+			{
+    			lexerdef << ns << "::LexerSymbols::" << symbol_names.at(symIndex);
+			};
+
+    		lexerdef << "DFA_MAKE_GROUP_NESTED( " << grp.first << ", ";
+    		sym(grp.second.ContainerIndex);
+    		sym(grp.second.StartIndex);
+    		sym(grp.second.EndIndex);
+    		lexerdef << ((grp.second.AdvanceMode == Egt::GroupRecord::Character) ? "true" : "false") << ", ";
+    		lexerdef << ((grp.second.EndingMode  == Egt::GroupRecord::Closed) 	 ? "true" : "false");
+
+    		for (auto & n : grp.second.GroupIndex)
+    			lexerdef << ", " << n;
+    		lexerdef << ")" << endl;
+    	}
+    	else
+    	{
+    		auto sym = [&](Egt::Integer symIndex)
+			{
+    			lexerdef << ns << "::LexerSymbols::" << symbol_names.at(symIndex) << ", ";
+			};
+
+    		lexerdef << "DFA_MAKE_GROUP( " << grp.first << ", ";
+    		sym(grp.second.ContainerIndex);
+    		sym(grp.second.StartIndex);
+    		sym(grp.second.EndIndex);
+    		lexerdef << ((grp.second.AdvanceMode == Egt::GroupRecord::Character) ? "true" : "false") << ", ";
+    		lexerdef << ((grp.second.EndingMode  == Egt::GroupRecord::Closed) 	 ? "true" : "false");
+    		lexerdef << ")" << endl;
+    	}
+    	lexerdef << endl;
+
+    	//collect the shit.
+    	lexerdef << "DFA_MAKE_GROUPLIST(";
+    	for (auto itr = f.GroupRecords.begin(); itr != f.GroupRecords.end(); /*itr++*/)
+    	{
+    		lexerdef << itr->first;
+    		if (++itr == f.GroupRecords.end())
+    			lexerdef << ");\n" << endl;
+    		else
+    			lexerdef << ", ";
+    	}
+    	lexerdef << endl;
+    }
+
+
+
 	lexerdef << "} //Dfa" << endl;
 	lexerdef << "} //Gpp" << endl;
 
