@@ -10,6 +10,7 @@
 
 #include <tuple>
 #include <stack>
+#include <utility>
 #include "DFA.h"
 
 #include <iostream>
@@ -35,7 +36,11 @@ enum Action_Enum
 	Error = 5, ///<Rule not recognized
 };
 
-
+template<int id>
+struct RulePP //rule parameter pack
+{
+	using Pack = std::tuple<>;
+};
 
 template<typename Action, typename First, typename ... Args>
 bool for_first(Action action, std::tuple<First, Args...> tpl)
@@ -56,13 +61,29 @@ bool for_first(Action  action, std::tuple<> tpl)
 	return false;
 };
 
+template<typename Symbol_t, Symbol_t, typename Iterator = void>
+struct SymbolType
+{
+	using Type = typename Iterator::Token;
+};
 
-template<typename Symbol_t, Symbol_t...Symbols>
+template<typename State, typename Iterator, typename Token = typename Iterator::value_type>
+bool execute_sm(Stack<Token>& stack, Iterator &itr, const Iterator &end);
+
+
+template<typename Symbol_t, Symbol_t my_symbol, Symbol_t...Symbols>
 struct Rule
 {
 	using symbols = value_tuple<Symbol_t, Symbols...>;
-	template<typename ...Args>
-	static void reduce(Args...) {};//todo: actions.
+	template<typename State, typename Iterator,  typename ...Args>
+	static bool reduce(State, Iterator &itr, const Iterator &end,
+					const typename SymbolType<Symbol_t, Symbols, Iterator>::Type&... rems,
+					Args&&... args)
+	{
+		using Obj = SymbolType<Symbol_t, my_symbol, Iterator>;
+
+		return execute_sm<State>(itr, end, Obj(rems...), std::forward<Args>(args)...);
+	}
 };
 
 template<int Index> struct RuleDef {};
@@ -102,8 +123,6 @@ struct AcceptAction
 	using Symbol = typename SymbolDef<SymbolIndex>::Symbol;
 };
 
-template<typename State, typename Iterator, typename Token = typename Iterator::value_type>
-bool execute_sm(Stack<Token>& stack, Iterator &itr, const Iterator &end);
 
 template<typename ... Actions_>
 struct State
@@ -113,43 +132,50 @@ struct State
 
 struct AcceptTrow {};
 
-template<typename Action, typename Iterator, typename Token = typename Iterator::value_type> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Reduce>, Stack<Token>& stack, Iterator &itr, const Iterator &end)
-{
-	stack.push(*itr);
 
+template<typename ...Rem>
+struct Cutter
+{
+	template<typename Obj, typename State, typename Iterator,  typename ...Args>
+	static bool cut(Iterator &itr, const Iterator &end, const Rem&... rems, Args&&... args)
+	{
+		return execute_sm<State>(itr, end, Obj(rems...), std::forward<Args>(args)...);
+	}
+};
+
+
+template<typename State, typename Action, typename Iterator, typename Token = typename Iterator::value_type, typename ...Stack> //reduce by a symbol
+bool execute_state(std::integral_constant<Action_Enum, Reduce>, Iterator &itr, const Iterator &end, Stack&&... stack)
+{
 	using Rule = typename Action::Rule;
-	Rule::reduce(stack);
+	Rule::reduce(State(), itr, end, std::forward<Stack>(stack)...);
 	return true;
 }
 
-template<typename Action, typename Iterator, typename Token = typename Iterator::value_type> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Shift>, Stack<Token>& stack, Iterator &itr, const Iterator &end)
+template<typename State, typename Action, typename Iterator, typename Token = typename Iterator::value_type, typename ...Stack> //reduce by a symbol
+bool execute_state(std::integral_constant<Action_Enum, Shift>, Iterator &itr, const Iterator &end, Stack&&... stack)
 {
-	stack.push(*itr);
-	execute_sm<typename Action::State>(stack, itr, end);
-	return false;
-
+	return execute_sm<typename Action::State>(itr, end, *itr , std::forward<Stack>(stack)...);
 }
 
-template<typename Action, typename Iterator, typename Token = typename Iterator::value_type> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Goto>, Stack<Token>& stack, Iterator &itr, const Iterator &end)
+template<typename State, typename Action, typename Iterator, typename Token = typename Iterator::value_type, typename ...Stack> //reduce by a symbol
+bool execute_state(std::integral_constant<Action_Enum, Goto>, Iterator &itr, const Iterator &end, Stack&&... stack)
 {
 	return false;
 }
 
-template<typename Action, typename Iterator, typename Token = typename Iterator::value_type> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Accept>, Stack<Token>& stack, Iterator &itr, const Iterator &end)
+template<typename State, typename Action, typename Iterator, typename Token = typename Iterator::value_type, typename ...Stack> //reduce by a symbol
+bool execute_state(std::integral_constant<Action_Enum, Accept>, Iterator &itr, const Iterator &end, Stack&&... stack)
 {
 	throw AcceptTrow();
 }
 
 
 
-template<typename State, typename Iterator, typename Token = typename Iterator::value_type>
-bool execute_sm(Stack<Token>& stack, Iterator &itr, const Iterator &end)
+template<typename State, typename Iterator, typename Token = typename Iterator::value_type, typename ...Args>
+bool execute_sm(Iterator &itr, const Iterator &end, Args&&... args)
 {
-	bool repeat = false;
+//	bool repeat = false;
 	bool found = false;
 	do
 	{
@@ -161,7 +187,7 @@ bool execute_sm(Stack<Token>& stack, Iterator &itr, const Iterator &end)
 				using ActionType = typename Action::ActionType;
 				if (Symbol::Id == itr->Id())
 				{
-					repeat = execute_state<Action>(ActionType(), stack, itr, end);
+					execute_state<State, Action>(ActionType(), itr, end, std::forward<Args>(args)...);
 					return true;
 				}
 				else
@@ -169,30 +195,20 @@ bool execute_sm(Stack<Token>& stack, Iterator &itr, const Iterator &end)
 			}, typename State::Actions());
 
 	}
-	while(repeat && found);
+	while(found);
 
 	return found;
 }
 
-template<typename Token, typename StartingState>
+template<typename Token, typename StartingState, typename Result>
 class StateMachine
 {
-	Stack<Token> _stack{[]{std::vector<Token> v; v.reserve(1000); return v;}};
 public:
 	using Start = StartingState;
 	template<typename Iterator>
-	bool parse(Iterator &itr, const Iterator &end)
+	boost::optional<Result> parse(Iterator &itr, const Iterator &end)
 	{
-		try
-		{
-			using Type = typename Start::ActionType;
-			execute_sm<Start>(Type(), itr, end);
-		}
-		catch (AcceptTrow&)
-		{
-			return true;
-		}
-		return false;
+		return execute_sm<Result, Start>(itr, end);;
 
 	}
 };
