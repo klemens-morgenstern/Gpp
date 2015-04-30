@@ -21,6 +21,7 @@
 #include "Egt/File.h"
 
 #include "Cpp/MakeLexer.h"
+#include "Cpp/MakeRules.h"
 
 #include "Tar/DFA.h"
 
@@ -34,7 +35,7 @@ int main()
 	File f = readRawFile("cte.egt");
 
 	Gpp::makeLexer(f, "Lexer", "CteParser", "out/");
-
+	Gpp::makRules (f, "Rules", "CteParser", "out/");
 //	Gpp::Dfa::test();
 
 	return 0;

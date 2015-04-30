@@ -12,6 +12,8 @@
 #include <stack>
 #include "DFA.h"
 
+#include <iostream>
+
 namespace Gpp {
 
 namespace Lalr
@@ -154,8 +156,8 @@ bool execute_sm(Stack<Token>& stack, Iterator &itr, const Iterator &end)
 		found = for_first(
 			[&](auto action) -> bool
 			{
-				using Action = decltype(action);
-				using Symbol = 	   typename Action::Symbol;
+				using Action 	 = decltype(action);
+				using Symbol 	 = typename Action::Symbol;
 				using ActionType = typename Action::ActionType;
 				if (Symbol::Id == itr->Id())
 				{
