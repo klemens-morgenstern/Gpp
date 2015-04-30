@@ -316,7 +316,7 @@ public:
 	Token(const Token&) = default;
 };
 
-template<typename Buffer, typename Start_, bool SendEof = false, typename Start_::Symbol Eof = typename Start_::Symbol()>
+template<typename Buffer, typename Start_, typename Noise = value_tuple<typename Start_::Symbol>, bool SendEof = false, typename Start_::Symbol Eof = typename Start_::Symbol()>
 class Lexer
 {
 public:
@@ -357,10 +357,12 @@ public:
 				if (gp.first) //found a group
 				{
 					beg = it;
-					func(Token(itr, beg, gp.second));
+					if (!contains(gp.second, Noise())) //remove noise
+						func(Token(itr, beg, gp.second));
 				}
 				else
-					func(Token(itr, beg, p.second));
+					if (!contains(gp.second, Noise())) //remove noise
+						func(Token(itr, beg, p.second));
 				itr = beg;
 			}
 		}
@@ -371,21 +373,21 @@ public:
 	}
 };
 
-template<typename Buffer, typename Start_, bool SendEof = false, typename Start_::Symbol Eof = typename Start_::Symbol()>
-class BufferedLexer : Lexer<Buffer, Start_, SendEof, Eof>
+template<typename Buffer, typename Start_, typename Noise = value_tuple<typename Start_::Symbol>, bool SendEof = false, typename Start_::Symbol Eof = typename Start_::Symbol()>
+class BufferedLexer : Lexer<Buffer, Start_, Noise, SendEof, Eof>
 {
-	std::vector<typename Lexer<Buffer, Start_, SendEof, Eof>::Token> _buf;
+	std::vector<Token<Buffer, typename Start_::Symbol>> _buf;
 public:
-	using iterator = typename std::vector<typename Lexer<Buffer, Start_, SendEof, Eof>::Token>::const_iterator;
-	using Lexer<Buffer, Start_, SendEof, Eof>::Lexer;
+	using iterator = typename std::vector<Token<Buffer, typename Start_::Symbol>>::const_iterator;
+	using Lexer<Buffer, Start_, Noise,  SendEof, Eof>::Lexer;
 
 	iterator begin() const {return _buf.cbegin();}
 	iterator end() const {return _buf.cend();}
 
 	void Tokenize()
 	{
-		Lexer<Buffer, Start_, SendEof, Eof>::Tokenize(
-				[this](const typename Lexer<Buffer, Start_, SendEof, Eof>::Token& tk)
+		Lexer<Buffer, Start_, Noise, SendEof, Eof>::Tokenize(
+				[this](const typename Lexer<Buffer, Start_, Noise, SendEof, Eof>::Token& tk)
 				{
 					_buf.push_back(tk);
 				});
@@ -425,7 +427,7 @@ struct GroupDef<Idx> {using Group = Group<decltype(ContainerSymbol), ContainerSy
 template<> \
 struct GroupList<false> {using Groups = typename GroupListHelper<Ids>::Tuple;};
 
-
+#define DFA_MAKE_NOISE(Symbols...) Gpp::Dfa::value_tuple<Symbols>
 
 }
 } /* namespace Egt */
