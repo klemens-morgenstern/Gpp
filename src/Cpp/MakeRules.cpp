@@ -54,6 +54,7 @@ void RuleMake::makeTree(const std::string& name, const std::string& ns, const st
 	ss << "#ifndef PARSER_" << name << "_TREE" << endl;
 	ss << "#define PARSER_" << name << "_TREE" << endl;
 
+	ss << "\n#include \"Token.hpp\"\n" << endl;
 	ss << "namespace Stubs\n{" << endl;
 	map<string, vector<Egt::Production>> mp;
 	for (auto & r : f.Productions)
@@ -65,7 +66,7 @@ void RuleMake::makeTree(const std::string& name, const std::string& ns, const st
 		mp[nm].push_back(r.second);
 	}
 
-	ss << endl;
+	ss << "}\n" <<endl;
 
 
 	ss << "namespace Tree \n{" << endl;
@@ -88,7 +89,7 @@ void RuleMake::makeTree(const std::string& name, const std::string& ns, const st
 		for (auto & v : r.second)
 		{
 			if (v.Symbols.size() == 0) continue; //no argument, i.e. default constructor.
-			ss << "\t" << nm << "(";
+			ss << "\t" << nm << "(const ";
 			for (auto itr = v.Symbols.begin(); itr != v.Symbols.end(); itr++)
 			{
 				if (itr != v.Symbols.begin())
@@ -98,9 +99,9 @@ void RuleMake::makeTree(const std::string& name, const std::string& ns, const st
 
 				auto s = RuleMake::make_token_name(sy.Name);
 				if (sy.Type == Egt::Symbol::Nonterminal)
-					ss << "Tree::" << s << "/* " << s << " */" ;
+					ss << "Tree::" << s << "& /* " << s << " */" ;
 				if (sy.Type == Egt::Symbol::Terminal)
-					ss << "Token " << "/* " << s << " */";
+					ss << "Token " << "& /* " << s << " */";
 
 			}
 			ss << ") {}" << endl;
@@ -127,7 +128,7 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 	ss << "#define PARSER_" << name << "_DEFS" << endl;
 
 	ss << "#include \"Tree.hpp\"" << endl;
-	ss << "#include \"LALR.hpp\"" << endl;
+	ss << "#include \"LALR.h\"" << endl;
 	ss << "#include \"LexerSymbols.hpp\"" << endl << endl;
 
 
@@ -140,7 +141,7 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 	for (auto &s : f.SymbolTable)
 	{
 		if (s.second.Type == Egt::Symbol::Nonterminal)
-			ss << "LALR_MAKE_SYMBOL_TYPE(" << s.first << ", " << make_token_name(s.second.Name) << ")" << endl;
+			ss << "LALR_MAKE_SYMBOL_TYPE(" << s.first << ", Tree::" << make_token_name(s.second.Name) << ")" << endl;
 	}
 	ss << endl;
 	///Make Symbol
@@ -160,15 +161,21 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 	///Rules
 	for (auto & r : f.Productions)
 	{
-		ss << "LALR_MAKE_RULE(" << r.first << ", " << r.second.HeadIndex;
-		for (auto &s : r.second.Symbols)
-			ss << ", " << s;
-
-
+		if (r.second.Symbols .size() == 0)
+		{
+			ss << "LALR_MAKE_EMPTY_RULE(" << r.first << ", " << r.second.HeadIndex;
+		}
+		else
+		{
+			ss << "LALR_MAKE_RULE(" << r.first << ", " << r.second.HeadIndex;
+			for (auto &s : r.second.Symbols)
+				ss << ", " << s;
+		}
 		auto &nm = f.SymbolTable.at(r.second.HeadIndex).Name;
 		ss << ")//" << string(nm.begin(), nm.end()) << endl;
 	}
 
+	ss << endl;
 	//States
 	for (auto & s : f.LALRStates)
 	{

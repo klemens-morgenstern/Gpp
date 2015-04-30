@@ -182,7 +182,7 @@ bool execute_sm(Iterator &itr, const Iterator &end, Args&&... args)
 	return found;
 }
 
-template<typename Token, int StartIndex = 0>//typename StartingState>
+template<int StartIndex = 0>//typename StartingState>
 class StateMachine
 {
 public:

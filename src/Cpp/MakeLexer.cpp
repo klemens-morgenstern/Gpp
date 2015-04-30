@@ -148,6 +148,14 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
 	lexerdef << " *      Author: Gpp Generator					   " <<  endl;
 	lexerdef << " */                                                 " <<  endl;
 	lexerdef << endl;
+
+    auto include_guard = boost::to_upper_copy(ns) + "_LEXER_DEFINES_H_";
+    lexerdef << "#ifndef " << include_guard <<  endl;
+    lexerdef << "#define " << include_guard <<  endl << endl;
+
+    lexerdef << "\n\n";
+
+
 	lexerdef << "#include \"LexerSymbols.hpp\"" << endl;
 	lexerdef << "#include <string> " << endl;
 	lexerdef << "#include \"Dfa.h\"\n" << endl;
@@ -302,6 +310,7 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
 
 	lexerdef << "} //" << ns <<endl;
 
+	lexerdef << "#endif //" << include_guard << endl;
 
 	ofstream file(path + "LexerDef.hpp");
 
