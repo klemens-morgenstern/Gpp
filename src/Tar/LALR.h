@@ -36,12 +36,6 @@ enum Action_Enum
 	Error = 5, ///<Rule not recognized
 };
 
-template<int id>
-struct RulePP //rule parameter pack
-{
-	using Pack = std::tuple<>;
-};
-
 template<typename Action, typename First, typename ... Args>
 bool for_first(Action action, std::tuple<First, Args...> tpl)
 {
@@ -124,25 +118,13 @@ struct AcceptAction
 };
 
 
+struct AcceptTrow {};
+
 template<typename ... Actions_>
 struct State
 {
 	using Actions = std::tuple<Actions_...>;
 };
-
-struct AcceptTrow {};
-
-
-template<typename ...Rem>
-struct Cutter
-{
-	template<typename Obj, typename State, typename Iterator,  typename ...Args>
-	static bool cut(Iterator &itr, const Iterator &end, const Rem&... rems, Args&&... args)
-	{
-		return execute_sm<State>(itr, end, Obj(rems...), std::forward<Args>(args)...);
-	}
-};
-
 
 template<typename State, typename Action, typename Iterator, typename Token = typename Iterator::value_type, typename ...Stack> //reduce by a symbol
 bool execute_state(std::integral_constant<Action_Enum, Reduce>, Iterator &itr, const Iterator &end, Stack&&... stack)
@@ -200,18 +182,50 @@ bool execute_sm(Iterator &itr, const Iterator &end, Args&&... args)
 	return found;
 }
 
-template<typename Token, typename StartingState, typename Result>
+template<typename Token, int StartIndex = 0>//typename StartingState>
 class StateMachine
 {
 public:
-	using Start = StartingState;
+	using Start = typename StateDef<StartIndex>::State; //StartingState;
 	template<typename Iterator>
-	boost::optional<Result> parse(Iterator &itr, const Iterator &end)
+	bool parse(Iterator &itr, const Iterator &end)
 	{
-		return execute_sm<Result, Start>(itr, end);;
+		try
+		{
+			//using Type = typename Start::ActionType;
+			execute_sm<Start>(itr, end);
+		}
+		catch (AcceptTrow&)
+		{
+			return true;
+		}
+		return false;
 
 	}
 };
+
+
+#define LALR_MAKE_SYMBOL_TYPE(Symbol, Class) \
+template<typename Iterator> \
+struct SymbolType<decltype(Symbol), Symbol, Iterator> \
+{ using Type = Class; }
+
+#define LALR_MAKE_SYMBOL(Index, Symbol) \
+template<> struct SymbolDef<Index> {static constexpr decltype(Symbol) Id = Symbol;};
+
+#define LALR_MAKE_RULE(Index, Symbol, SubSymbols...) \
+template<> struct RuleDef<Index> \
+{using Rule = Rule<decltype(Symbol), Symbol, SubSymbols>;};
+
+#define LALR_MAKE_STATE(Index, Actions...) \
+template<> struct StateDef<Index> {using State = State<Actions>;};
+
+
+#define LALR_MAKE_SHIFT_ACTION(Index, SymIndex)  ShiftAction<Index, SymIndex>
+#define LALR_MAKE_REDUCE_ACTION(Index, SymIndex) ReduceAction<Index, SymIndex>
+#define LALR_MAKE_GOTO_ACTION(Index, SymIndex) 	 GotoAction<Index, SymIndex>
+#define LALR_MAKE_ACCEPT_ACTION(Index, SymIndex) AcceptAction<Index, SymIndex>
+
 
 
 } /* namespace Egt */

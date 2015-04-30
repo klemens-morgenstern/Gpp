@@ -73,7 +73,6 @@ void LexerMake::make_symbols(const std::string& name, const std::string& ns, con
 
 	header << "enum class LexerSymbols \n\t{" << endl;
 
-	int i = 1;
 	for (auto &s : f.SymbolTable)
 	{
 		using namespace Egt;
@@ -82,7 +81,7 @@ void LexerMake::make_symbols(const std::string& name, const std::string& ns, con
 		{
 			auto nm = make_token_name(s.second.Name);
 			symbol_names[s.first] = nm;
-			header << "\t\t" << nm << " = " << i++  << ",\n";
+			header << "\t\t" << nm << " = " << s.first /*i++*/  << ",\n";
 		}
 		else if (type == Symbol::EndOfFile)
 		{
@@ -90,26 +89,26 @@ void LexerMake::make_symbols(const std::string& name, const std::string& ns, con
 			if (ef == "EOF")
 				ef = "Eof";
 			symbol_names[s.first] = ef;
-			header << "\t\t" << ef << " = " << i++  << ",\n";//" = ~0,\n";
+			header << "\t\t" << ef << " = " << s.first /*i++*/  << ",\n";//" = ~0,\n";
 			eof = ef;
 		}
 		else if (type == Symbol::Noise)
 		{
 			auto nm = make_token_name(s.second.Name);
 			symbol_names[s.first] = nm;
-			header << "\t\t" << nm << " = " << i++  << ",\n";//" =  ~1,\n";
+			header << "\t\t" << nm << " = " << s.first /*i++*/  << ",\n";//" =  ~1,\n";
 		}
 		else if (type == Symbol::GroupStart)
 		{
 			auto nm = make_token_name(s.second.Name) + "Start";
 			symbol_names[s.first] = nm;
-			header << "\t\t" << nm << " = " << i++  << ",\n";//" =  ~1,\n";
+			header << "\t\t" << nm << " = " << s.first /*i++*/  << ",\n";//" =  ~1,\n";
 		}
 		else if (type == Symbol::GroupEnd)
 		{
 			auto nm = make_token_name(s.second.Name) + "End";
 			symbol_names[s.first] = nm;
-			header << "\t\t" << nm << " = " << i++  << ",\n";//" =  ~1,\n";
+			header << "\t\t" << nm << " = " << s.first /*i++*/  << ",\n";//" =  ~1,\n";
 		}
 
 	}
@@ -307,7 +306,6 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
 	ofstream file(path + "LexerDef.hpp");
 
 	file << lexerdef.rdbuf() << endl;;
-
 
 }
 

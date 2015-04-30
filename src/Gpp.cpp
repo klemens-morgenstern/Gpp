@@ -35,7 +35,7 @@ int main()
 	File f = readRawFile("cte.egt");
 
 	Gpp::makeLexer(f, "Lexer", "CteParser", "out/");
-	Gpp::makRules (f, "Rules", "CteParser", "out/");
+	Gpp::makeRules (f, "Rules", "CteParser", "out/");
 //	Gpp::Dfa::test();
 
 	return 0;
