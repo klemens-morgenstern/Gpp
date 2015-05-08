@@ -14,7 +14,7 @@ namespace Egt
 
 struct visi : boost::static_visitor<wstring>
 {
-	wstring operator()(boost::blank) {return L"blank";}
+	wstring operator()(boost::none_t) {return L"blank";}
 	wstring operator()(char val)
 	{
 		wostringstream ws;

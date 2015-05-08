@@ -378,11 +378,11 @@ class BufferedLexer : Lexer<Buffer, Start_, Noise, SendEof, Eof>
 {
 	std::vector<Token<Buffer, typename Start_::Symbol>> _buf;
 public:
-	using iterator = typename std::vector<Token<Buffer, typename Start_::Symbol>>::const_iterator;
+	using Iterator = typename std::vector<Token<Buffer, typename Start_::Symbol>>::const_iterator;
 	using Lexer<Buffer, Start_, Noise,  SendEof, Eof>::Lexer;
 
-	iterator begin() const {return _buf.cbegin();}
-	iterator end() const {return _buf.cend();}
+	Iterator begin() const {return _buf.cbegin();}
+	Iterator end() const {return _buf.cend();}
 
 	void Tokenize()
 	{

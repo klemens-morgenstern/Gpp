@@ -13,6 +13,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string_regex.hpp>
 #include <boost/optional.hpp>
+#include <map>
 
 #include <iostream>
 using namespace std;
@@ -27,7 +28,16 @@ struct RuleMake
 	static string make_token_name(const wstring &in);
 	void makeTree(const std::string& name, const std::string& ns, const std::string & path);
 	void makeParser(const std::string& name, const std::string& ns, const std::string & path);
-
+	static string make_symbol_name(const Egt::Symbol &sym)
+	{
+		if (sym.Type == Egt::Symbol::Nonterminal)
+			return "NonTerminal_" + make_token_name(sym.Name);
+		else if (sym.Type == Egt::Symbol::EndOfFile) //not clean
+			return "Eof";
+		else
+			return  make_token_name(sym.Name);
+	}
+	std::map<int, string> RuleNames;
 };
 
 string RuleMake::make_token_name(const wstring &in)
@@ -129,90 +139,132 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 
 	ss << "#include \"Tree.hpp\"" << endl;
 	ss << "#include \"LALR.h\"" << endl;
-	ss << "#include \"LexerSymbols.hpp\"" << endl << endl;
+	ss << "#include \"Symbols.hpp\"" << endl << endl;
 
 
 
 	ss << "namespace Gpp \n{\n" << endl;
 	ss << "namespace Lalr \n{\n\n" << endl;
 
-
-	///make Symbol Types
-	for (auto &s : f.SymbolTable)
-	{
-		if (s.second.Type == Egt::Symbol::Nonterminal)
-			ss << "LALR_MAKE_SYMBOL_TYPE(" << s.first << ", Tree::" << make_token_name(s.second.Name) << ")" << endl;
-	}
-	ss << endl;
+	int lower = 10000;
+	int upper = 0;
 	///Make Symbol
 	for (auto &s : f.SymbolTable)
 	{
-		if (s.second.Type == Egt::Symbol::Nonterminal)
+		if (s.first < lower)
+			lower = s.first;
+
+		if (s.first > upper)
+			upper = s.first;
+
+		if (s.second.Type == Egt::Symbol::Terminal)
 		{
-			ss << "LALR_MAKE_SYMBOL(" << s.first << ", " << s.first << ")";
-			ss << "//" << make_token_name(s.second.Name) << endl;
-		}
-		else if (s.second.Type == Egt::Symbol::Terminal)
-		{
-			ss << "LALR_MAKE_SYMBOL(" << s.first << ", " << ns << "::LexerSymbols::" << make_token_name(s.second.Name) << ")" << endl;
+			ss << "LALR_MAKE_SYMBOL_TOKEN(" << s.first << ")" << endl;
 		}
 	}
-	ss << endl;
+	ss << endl << endl;
+
+	//START the mother
+	ss << "LALR_MAKE_PARSER(" << lower << ", " << upper << ")\n//{" << endl;
+
 	///Rules
+
+	ss << "\tstruct Rules\n\t{" << endl;
+
+	ss << "\t\tusing Token = typename Sm_t::Token;" << endl;
+	ss << "\t\tusing Context = typename Sm_t::Context;" << endl;
+	ss << "\t\tusing Stack = typename Sm_t::Stack;" << endl;
+
+	std::set<string> double_names; //to prevent double naming.
 	for (auto & r : f.Productions)
 	{
-		if (r.second.Symbols .size() == 0)
+		auto &nm = f.SymbolTable.at(r.second.HeadIndex).Name;
+		auto nms = make_token_name(nm);
+		string name;
+		if (double_names.count(nms) != 0)
 		{
-			ss << "LALR_MAKE_EMPTY_RULE(" << r.first << ", " << r.second.HeadIndex;
+			int i = 0;
+			while (double_names.count(nms + std::to_string(i)) != 0) i++;
+
+			name = nms + std::to_string(i);
+			double_names.emplace(name);
+
 		}
 		else
 		{
-			ss << "LALR_MAKE_RULE(" << r.first << ", " << r.second.HeadIndex;
+			name = nms;
+			double_names.emplace(name);
+		}
+
+		RuleNames[r.first] = name;
+
+		if (r.second.Symbols .size() == 0)
+		{
+			ss << "\t\tLALR_MAKE_EMPTY_RULE(" << r.first << ", " << name << ", " << r.second.HeadIndex;
+		}
+		else
+		{
+			ss << "\t\tLALR_MAKE_RULE(" << r.first << ", " << name<< ", " << r.second.HeadIndex;
 			for (auto &s : r.second.Symbols)
 				ss << ", " << s;
 		}
-		auto &nm = f.SymbolTable.at(r.second.HeadIndex).Name;
-		ss << ")//" << string(nm.begin(), nm.end()) << endl;
+		ss << ")//Arguments: ";
+
+		for (auto s : r.second.Symbols)
+		{
+			auto sm = f.SymbolTable.at(s).Name;
+			ss << string(sm.begin(), sm.end()) << ", ";
+		}
+
+		ss << endl;
 	}
 
-	ss << endl;
+	ss << "\t};\n\n\tRules rules;\n" << endl;
 	//States
 	for (auto & s : f.LALRStates)
 	{
-		ss << "LALR_MAKE_STATE(" << s.first;
+		ss << "\tLALR_MAKE_STATE(" << s.first;
 
 		for (auto &a : s.second.Actions)
 		{
 			ss << ", ";
+
+			auto sym = make_symbol_name(f.SymbolTable.at(a.SymbolIndex));
+
+
 			switch (a.Action)
 			{
 			case Egt::LALRState::Shift:
 				ss << "LALR_MAKE_SHIFT_ACTION(";
+				ss << ns << "::Symbols::" << sym;
+				ss << ", " << a.TargetIndex << ")";
 				break;
 			case Egt::LALRState::Reduce:
-				ss << "LALR_MAKE_REDUCE_ACTION(";
+				ss << "LALR_MAKE_REDUCE_ACTION(" ;
+				ss << ns << "::Symbols::" << sym;
+				ss << ", rules." << RuleNames[a.TargetIndex] << ")";
 				break;
 			case Egt::LALRState::Goto:
 				ss << "LALR_MAKE_GOTO_ACTION(";
+				ss << ns << "::Symbols::" << sym;
+				ss << ", " << a.TargetIndex << ")";
 				break;
 			case Egt::LALRState::Accept:
-				ss << "LALR_MAKE_ACCEPT_ACTION(";
+				ss << "LALR_MAKE_ACCEPT_ACTION(" << a.TargetIndex << ")";
 				break;
 			}
-			ss  << a.TargetIndex << ", " << a.SymbolIndex << ")";
 		}
 		ss << ")" << endl;
 	}
 
+	ss << "\tParser() : Sm_t(State" << f.InitialStates.LALR	<< ") {};\n" << endl;
+	ss << "};\n" << endl;
 
 	ss << "} //Lalr" << endl;
 	ss << "} //Gpp" << endl;
 
 	ss << "namespace " << ns << "\n{" << endl;
-
-	ss << "using Parser = Gpp::Lalr::StateMachine<";
-	ss << f.InitialStates.LALR;
-	ss << ">;" << endl;
+	ss << "using Gpp::Lalr::Parser;" << endl;
 
 	ss << "} //" << ns << endl;
 

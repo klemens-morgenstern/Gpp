@@ -56,7 +56,7 @@ void LexerMake::make_symbols(const std::string& name, const std::string& ns, con
 	stringstream header;
 
 	header << "/*                                                  " <<  endl;
-	header << " *" << "LexerSymbols.hpp" <<  endl;
+	header << " *" << "Symbols.hpp" <<  endl;
 	header << " *                                                  " <<  endl;
 	header << " *  Created on: "<< __DATE__ <<  endl;
 	header << " *      Author: Gpp Generator					   " <<  endl;
@@ -71,7 +71,7 @@ void LexerMake::make_symbols(const std::string& name, const std::string& ns, con
 
 	header << "namespace " << ns << "\n{\n";
 
-	header << "enum class LexerSymbols \n\t{" << endl;
+	header << "enum class Symbols \n\t{" << endl;
 
 	for (auto &s : f.SymbolTable)
 	{
@@ -110,6 +110,12 @@ void LexerMake::make_symbols(const std::string& name, const std::string& ns, con
 			symbol_names[s.first] = nm;
 			header << "\t\t" << nm << " = " << s.first /*i++*/  << ",\n";//" =  ~1,\n";
 		}
+		else if (type == Symbol::Nonterminal)
+		{
+			auto nm = "NonTerminal_" + make_token_name(s.second.Name);
+			symbol_names[s.first] = nm;
+			header << "\t\t" << nm << " = " << s.first /*i++*/  << ",\n";//" =  ~1,\n";
+		}
 
 	}
 	header << "\t};\n" << endl;
@@ -118,7 +124,7 @@ void LexerMake::make_symbols(const std::string& name, const std::string& ns, con
 	header << endl;
 	header << "#endif // " << include_guard << endl;
 
-	ofstream file(path + "LexerSymbols.hpp");
+	ofstream file(path + "Symbols.hpp");
 
 	file << header.rdbuf() << endl;;
 }
@@ -156,7 +162,7 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
     lexerdef << "\n\n";
 
 
-	lexerdef << "#include \"LexerSymbols.hpp\"" << endl;
+	lexerdef << "#include \"Symbols.hpp\"" << endl;
 	lexerdef << "#include <string> " << endl;
 	lexerdef << "#include \"Dfa.h\"\n" << endl;
 	lexerdef << "namespace Gpp \n{" << endl;
@@ -174,7 +180,7 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
     		else
     			lexerdef << "DFA_MAKE_END_STATE(";
 
-    		lexerdef << id << ", " << ns << "::LexerSymbols::" << symbol_names.at(state.second.AcceptIndex);
+    		lexerdef << id << ", " << ns << "::Symbols::" << symbol_names.at(state.second.AcceptIndex);
     	}
     	else
     	{
@@ -183,7 +189,7 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
     		else
     			lexerdef << "DFA_MAKE_NOEND_STATE(";
 
-    		lexerdef << id << ", " << ns << "::LexerSymbols";
+    		lexerdef << id << ", " << ns << "::Symbols";
 
     	}
 
@@ -208,7 +214,7 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
     	{
     		auto sym = [&](Egt::Integer symIndex)
 			{
-    			lexerdef << ns << "::LexerSymbols::" << symbol_names.at(symIndex);
+    			lexerdef << ns << "::Symbols::" << symbol_names.at(symIndex);
 			};
 
     		lexerdef << "DFA_MAKE_GROUP_NESTED( " << grp.first << ", ";
@@ -226,7 +232,7 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
     	{
     		auto sym = [&](Egt::Integer symIndex)
 			{
-    			lexerdef << ns << "::LexerSymbols::" << symbol_names.at(symIndex) << ", ";
+    			lexerdef << ns << "::Symbols::" << symbol_names.at(symIndex) << ", ";
 			};
 
     		lexerdef << "DFA_MAKE_GROUP( " << grp.first << ", ";
@@ -266,47 +272,47 @@ void LexerMake::make_lexerdef(const std::string& name, const std::string& ns, co
 
 	lexerdef << "typename Gpp::Dfa::StateDef<" <<f.InitialStates.DFA << ">::state";
 
-	lexerdef << ", DFA_MAKE_NOISE(" << ns << "::LexerSymbols";
+	lexerdef << ", DFA_MAKE_NOISE(" << ns << "::Symbols";
 	for (auto &sym : f.SymbolTable)
 	{
 		if (sym.second.Type == Egt::Symbol::Noise)
 		{
-			lexerdef << ", " << ns << "::LexerSymbols::" << symbol_names.at(sym.first);
+			lexerdef << ", " << ns << "::Symbols::" << symbol_names.at(sym.first);
 
 		}
 	}
 	lexerdef << ")";
 	if (eof)
 	{
-		lexerdef << ", true, "<< ns << "::LexerSymbols::" << *eof;
+		lexerdef << ", true, "<< ns << "::Symbols::" << *eof;
 	}
 	lexerdef << ">;\n" << endl;
 
 	///define the buffered lexer
 	lexerdef << "template<typename Buffer = std::wstring>" << endl;
-	lexerdef << "using Lexer = Gpp::Dfa::Lexer<Buffer, ";
+	lexerdef << "using BufferedLexer = Gpp::Dfa::BufferedLexer<Buffer, ";
 
 	lexerdef << "typename Gpp::Dfa::StateDef<" <<f.InitialStates.DFA << ">::state";
 
-	lexerdef << ", DFA_MAKE_NOISE(" << ns << "::LexerSymbols";
+	lexerdef << ", DFA_MAKE_NOISE(" << ns << "::Symbols";
 	for (auto &sym : f.SymbolTable)
 	{
 		if (sym.second.Type == Egt::Symbol::Noise)
 		{
-			lexerdef << ", " << ns << "::LexerSymbols::" << symbol_names.at(sym.first);
+			lexerdef << ", " << ns << "::Symbols::" << symbol_names.at(sym.first);
 
 		}
 	}
 	lexerdef << ")";
 	if (eof)
 	{
-		lexerdef << ", true, "<< ns << "::LexerSymbols::" << *eof;
+		lexerdef << ", true, "<< ns << "::Symbols::" << *eof;
 	}
 	lexerdef << ">;\n" << endl;
 
 	///declare token
 	lexerdef << "template<typename Buffer = std::wstring>" << endl;
-	lexerdef << "using Token = Gpp::Dfa::Token<Buffer, CteParser::LexerSymbols>;" << endl;
+	lexerdef << "using Token = Gpp::Dfa::Token<Buffer, CteParser::Symbols>;" << endl;
 
 	lexerdef << "} //" << ns <<endl;
 

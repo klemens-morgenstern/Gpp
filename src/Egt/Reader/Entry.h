@@ -22,7 +22,7 @@ namespace Egt {
 class Entry
 {
 public:
-	typedef boost::variant<boost::blank, Byte, Boolean, Integer, String> data_t;
+	typedef boost::variant<boost::none_t, Byte, Boolean, Integer, String> data_t;
 	data_t data = boost::none;
 	Entry() = default;
 	Entry(Entry && )= default;
