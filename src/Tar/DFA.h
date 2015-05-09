@@ -67,7 +67,10 @@ bool contains(T  value, value_tuple<Type, First> tpl)
 };
 
 template<typename T, typename U>
-bool contains(T  value, value_tuple<U> tpl) {return false;};
+bool contains(T  value, value_tuple<U> tpl)
+{
+	return false;
+};
 
 
 //new version.
@@ -361,7 +364,7 @@ public:
 						func(Token(itr, beg, gp.second));
 				}
 				else
-					if (!contains(gp.second, Noise())) //remove noise
+					if (!contains(p.second, Noise())) //remove noise
 						func(Token(itr, beg, p.second));
 				itr = beg;
 			}

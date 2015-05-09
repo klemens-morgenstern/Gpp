@@ -12,6 +12,12 @@
 #include <stack>
 #include <utility>
 #include "DFA.h"
+#include <boost/variant.hpp>
+#include <boost/none.hpp>
+#include <type_traits>
+#include <utility>
+#include <boost/ptr_container/ptr_vector.hpp>
+#include <memory>
 
 #include <iostream>
 
@@ -36,195 +42,398 @@ enum Action_Enum
 	Error = 5, ///<Rule not recognized
 };
 
-template<typename Action, typename First, typename ... Args>
-bool for_first(Action action, std::tuple<First, Args...> tpl)
-{
-	if (action(First())) return true;
-	return for_all(action, std::tuple<Args...>());
-};
-
-template<typename Action, typename First>
-bool for_first(Action  action, std::tuple<First> tpl)
-{
-	return action(First());
-};
-
-template<typename Action>
-bool for_first(Action  action, std::tuple<> tpl)
-{
-	return false;
-};
-
-template<typename Symbol_t, Symbol_t, typename Iterator = void>
+template<int Id>
 struct SymbolType
 {
-	using Type = typename Iterator::Token;
+	using Type = boost::none_t;
 };
 
-template<typename State, typename Iterator, typename Token = typename Iterator::value_type>
-bool execute_sm(Stack<Token>& stack, Iterator &itr, const Iterator &end);
+
+struct MyVariant;
+
+template<int Id> 		auto get(MyVariant &var) -> typename SymbolType<Id>::type&;
+template<typename T>   T& get(MyVariant &var);
+
+struct NoRuleAction
+{
+	using result_type = boost::none_t;
+	template<typename ...Args>
+	static boost::none_t Action(Args...) {return boost::none;}
+
+};
+
+template<int Id>
+struct RuleAction : NoRuleAction//the type of the rule, i.e. what it returns.
+{
+};
+
+template<typename Token>
+struct TokenWrapper
+{
+	using Type = Token; //used for passing as RuleObject
+};
 
 
-template<typename Symbol_t, Symbol_t my_symbol, Symbol_t...Symbols>
+template<typename Action_, typename Context, typename ...RuleObject>
+struct ExecuteRuleAction
+{
+	template<typename Stack>
+	static void Reduce(Context& ctx, Stack& stack)
+	{
+		Build(ctx, stack, std::integral_constant<size_t, sizeof...(RuleObject)>());
+	}
+
+	template<typename Counter, typename Stack, typename ...Args>
+	static void Build(Context& ctx, Stack& stack, Counter,  Args&&...args)
+	{
+		auto obj = std::move(stack.top());
+		stack.pop();
+		Build(ctx, stack, std::integral_constant<size_t, Counter::value-1>(), std::move(obj), std::move(args)...);
+	}
+
+	template<typename Stack, typename ...Args>
+	static void Build(Context& ctx, Stack& stack, std::integral_constant<size_t, 0>, Args&&... args)
+	{
+		Action(ctx, stack, std::move(args)...);
+	}
+	template<typename Stack, typename ...Args>
+	static void Action(Context& ctx, Stack & stack, Args && ...args)
+	{
+		auto res = std::move(
+					Action_::Action(
+							ctx,
+							std::move(get<RuleObject>(args))...//TODO check if that works.
+					));
+		stack.emplace(std::move(res));
+	}
+
+};
+
+template<typename Context, typename ...RuleObject>
+struct ExecuteRuleAction<NoRuleAction, Context, RuleObject...>
+{
+	template<typename Stack>
+	static void Reduce(Context& ctx, Stack& stack)
+	{
+		Build(stack, std::integral_constant<size_t, sizeof...(RuleObject)>());
+	}
+	template<typename Stack, typename Counter>
+	static void Build(Stack& stack, Counter)
+	{
+		stack.pop();
+		Build(stack, std::integral_constant<size_t, Counter::value - 1>());
+	}
+	template<typename Stack>
+	static void Build(Stack& stack, std::integral_constant<size_t, 1>)
+	{
+		stack.emplace(boost::none);
+	}
+};
+
+template<typename Context, typename Stack>
 struct Rule
 {
-	using symbols = value_tuple<Symbol_t, Symbols...>;
-	template<typename State, typename Iterator,  typename ...Args>
-	static bool reduce(State, Iterator &itr, const Iterator &end,
-					const typename SymbolType<Symbol_t, Symbols, Iterator>::Type&... rems,
-					Args&&... args)
+	const int Id;
+	virtual int Reduce(Context& ctx, Stack &stack) = 0;
+	Rule(int Id) : Id(Id) {}
+	Rule(const Rule&) = default;
+	virtual ~Rule() = default;
+};
+
+template<int Id, int SymId, typename Context, typename Stack, int...RuleId>
+struct RuleImpl : Rule<Context, Stack>
+{
+	using Action = RuleAction<Id>;
+	using Type = typename SymbolType<SymId>::Type;
+
+	RuleImpl() : Rule<Context, Stack>(SymId) {};
+	RuleImpl(const RuleImpl&) = default;
+	virtual int Reduce(Context& ctx, Stack &stack) override
 	{
-		using Obj = SymbolType<Symbol_t, my_symbol, Iterator>;
-
-		return execute_sm<State>(itr, end, Obj(rems...), std::forward<Args>(args)...);
+		ExecuteRuleAction<Action, Context,  typename SymbolType<RuleId>::Type...>::Reduce(ctx, stack);
+		return sizeof...(RuleId);
 	}
+	virtual ~RuleImpl() = default;
 };
-
-template<int Index> struct RuleDef {};
-template<int Index> struct StateDef {};
-template<int Index> struct SymbolDef {};
-
-
-template<int StateIndex, int SymbolIndex>
-struct ShiftAction
-{
-	using ActionType = std::integral_constant<Action_Enum, Shift>;
-	using State = typename StateDef<StateIndex>::State;
-	using Symbol = typename SymbolDef<SymbolIndex>::Symbol;
-
-};
-
-template<int StateIndex, int SymbolIndex>
-struct ReduceAction
-{
-	using ActionType = std::integral_constant<Action_Enum, Reduce>;
-	using Rule = typename RuleDef<StateIndex>::Rule;
-	using Symbol = typename SymbolDef<SymbolIndex>::Symbol;
-};
-
-template<int StateIndex, int SymbolIndex>
-struct GotoAction
-{
-	using ActionType = std::integral_constant<Action_Enum,  Goto>;
-	using State = typename StateDef<StateIndex>::State;
-	using Symbol = typename SymbolDef<SymbolIndex>::Symbol;
-};
-
-template<int StateIndex, int SymbolIndex>
-struct AcceptAction
-{
-	using ActionType = std::integral_constant<Action_Enum,  Accept>;
-	using Symbol = typename SymbolDef<SymbolIndex>::Symbol;
-};
-
-
-struct AcceptTrow {};
-
-template<typename ... Actions_>
+/*
+template<typename Context, typename Stack, typename...RuleObject>
+using NoActionRuleImpl = RuleImpl<Context, Stack, RuleObject...>;
+*/
+template<typename Context, typename Stack, typename Iterator>
 struct State
 {
-	using Actions = std::tuple<Actions_...>;
+	using Rule_ = Rule<Context, Stack>;
+	struct Shift	{ State &state; Shift(State& st) : state(st) {};};
+	struct Reduce 	{ Rule_ &rule;  Reduce(Rule_& rl) : rule(rl) {};};
+	struct Goto		{ State &state; Goto(State& st) : state(st) {};};
+	struct Accept   {};
+
+	struct StateAction;
+	struct ActionVisitor;
+	const int Id;
+	std::vector<StateAction> Actions;
+	State(int Id, std::initializer_list<StateAction> init) : Id(Id), Actions(init) {}
+	State() = default;
+	State(const State&) = default;
 };
 
-template<typename State, typename Action, typename Iterator, typename Token = typename Iterator::value_type, typename ...Stack> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Reduce>, Iterator &itr, const Iterator &end, Stack&&... stack)
+
+
+
+template<typename Context, typename Stack, typename Iterator>
+struct State<Context, Stack, Iterator>::StateAction
 {
-	using Rule = typename Action::Rule;
-	Rule::reduce(State(), itr, end, std::forward<Stack>(stack)...);
-	return true;
-}
+	using Token 	= typename Iterator::value_type;
+	using Symbol_t 	= typename Token::Symbol;
+	Symbol_t Id;
+	boost::variant<Shift, Reduce, Goto, Accept> Action;
 
-template<typename State, typename Action, typename Iterator, typename Token = typename Iterator::value_type, typename ...Stack> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Shift>, Iterator &itr, const Iterator &end, Stack&&... stack)
+	bool Execute(Iterator &current, Context &ctx, Stack &stack, State<Context, Stack, Iterator>*& state, std::stack<State*> &state_stack,	Symbol_t &current_symbol)
+	{
+		ActionVisitor vis(current, ctx, stack, state, state_stack, current_symbol);
+		return Action.apply_visitor(vis);
+	}
+	StateAction(Symbol_t Id, const Shift&  arg) : Id(Id), Action(arg) {};
+	StateAction(Symbol_t Id, const Reduce& arg) : Id(Id), Action(arg) {};
+	StateAction(Symbol_t Id, const Goto&   arg) : Id(Id), Action(arg) {};
+	StateAction(Symbol_t Id, const Accept& arg) : Id(Id), Action(arg) {};
+	StateAction(const StateAction&) = default;
+	StateAction(StateAction&&) noexcept = default;
+};
+
+template<typename Context, typename Stack, typename Iterator>
+struct State<Context, Stack, Iterator>::ActionVisitor : boost::static_visitor<bool>
 {
-	return execute_sm<typename Action::State>(itr, end, *itr , std::forward<Stack>(stack)...);
-}
+	using Token = typename Iterator::value_type;
+	using Symbol_t = typename Token::Symbol;
 
-template<typename State, typename Action, typename Iterator, typename Token = typename Iterator::value_type, typename ...Stack> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Goto>, Iterator &itr, const Iterator &end, Stack&&... stack)
+	Iterator &current;
+	Context &ctx;
+	Stack &stack;
+
+	State<Context, Stack, Iterator>*& state;
+
+	std::stack<State*> &state_stack;
+	Symbol_t &current_symbol;
+
+
+	ActionVisitor(Iterator &current, Context &ctx, Stack &stack, State<Context, Stack, Iterator>*& state, std::stack<State*> &state_stack,	Symbol_t &current_symbol)
+		: current(current), ctx(ctx), stack(stack), state(state), state_stack(state_stack), current_symbol(current_symbol) {};
+
+	bool operator()(Shift& shift)
+	{
+		stack.emplace(Token(*current));
+		current++;
+		current_symbol = current->Id();
+		state_stack.emplace(state);
+		state = &shift.state;
+
+		return false;
+	}
+	bool operator()(Reduce & red)
+	{
+
+		state_stack.emplace(state);
+		auto cnt = red.rule.Reduce(ctx, stack);
+		for (int i = 0; i < cnt; i++) //because this one also counts as state.
+			state_stack.pop();
+
+		current_symbol = static_cast<Symbol_t>(red.rule.Id);
+		state = state_stack.top();
+		return false;
+	}
+	bool operator()(Goto &_goto)
+	{
+		//state_stack.emplace(state);
+		state = &_goto.state;
+		current_symbol = current->Id();
+		return false;
+	}
+	bool operator()(Accept & acc) {return true;}
+};
+
+template<typename State, typename Context, typename Stack, typename Iterator>
+bool execute_sm(State* state, Context& ctx, Stack& stack, Iterator &itr, const Iterator &end)
 {
-	return false;
-}
-
-template<typename State, typename Action, typename Iterator, typename Token = typename Iterator::value_type, typename ...Stack> //reduce by a symbol
-bool execute_state(std::integral_constant<Action_Enum, Accept>, Iterator &itr, const Iterator &end, Stack&&... stack)
-{
-	throw AcceptTrow();
-}
-
-
-
-template<typename State, typename Iterator, typename Token = typename Iterator::value_type, typename ...Args>
-bool execute_sm(Iterator &itr, const Iterator &end, Args&&... args)
-{
-//	bool repeat = false;
+	bool eof = false;
 	bool found = false;
+	using namespace std;
+
+	using Token = typename Iterator::value_type;
+	using Symbol_t = typename Token::Symbol;
+
+	std::stack<State*> state_stack;
+	state_stack.emplace(state);
+	Symbol_t current_symbol = itr->Id();
 	do
 	{
-		found = for_first(
-			[&](auto action) -> bool
+		found = false;
+
+		for (auto &act : state->Actions)
+		{
+			found = false;
+			if (act.Id == current_symbol)
 			{
-				using Action 	 = decltype(action);
-				using Symbol 	 = typename Action::Symbol;
-				using ActionType = typename Action::ActionType;
-				if (Symbol::Id == itr->Id())
-				{
-					execute_state<State, Action>(ActionType(), itr, end, std::forward<Args>(args)...);
-					return true;
-				}
-				else
-					return false;
-			}, typename State::Actions());
+				found = true;
+				eof = act.Execute(itr, ctx, stack, state, state_stack, current_symbol);
+				break;
+			}
+		}
 
 	}
-	while(found);
-
-	return found;
+	while(found && !eof && (itr != end));
+	return eof;
 }
 
-template<int StartIndex = 0>//typename StartingState>
-class StateMachine
+template<typename Context_, typename Types, typename Iterator_>
+struct StateMachine
 {
-public:
-	using Start = typename StateDef<StartIndex>::State; //StartingState;
-	template<typename Iterator>
-	bool parse(Iterator &itr, const Iterator &end)
-	{
-		try
-		{
-			//using Type = typename Start::ActionType;
-			execute_sm<Start>(itr, end);
-		}
-		catch (AcceptTrow&)
-		{
-			return true;
-		}
-		return false;
+	using Iterator = Iterator_;
+	using Context = Context_;
+	using Stack = std::stack<Types, std::vector<Types>>;
+	using Token = typename Iterator::value_type;
 
+	State<Context, Stack, Iterator> & start;
+	bool parse(Context &context, Iterator &itr, const Iterator &end)
+	{
+		Stack  stack;
+		return execute_sm(&start, context, stack, itr, end);
 	}
+	StateMachine(State<Context, Stack, Iterator> & start) : start(start) {}
+};
+
+struct VariantFather
+{
+	virtual ~VariantFather() = default;
+	virtual std::unique_ptr<VariantFather> clone() const = 0;
+	virtual std::unique_ptr<VariantFather> move () = 0;
+};
+
+template<typename T>
+struct Variant : VariantFather
+{
+	T member;
+
+	Variant(T&& obj) : member(std::move(obj)) {}
+	Variant(const T& obj) : member(obj) {};
+	Variant(const Variant&) = default;
+	Variant(Variant&&) noexcept = default;
+	virtual ~Variant() = default;
+
+	virtual std::unique_ptr<VariantFather> clone() const { return std::make_unique<Variant>(member);}
+	virtual std::unique_ptr<VariantFather> move () 		 { return std::make_unique<Variant>(std::move(member)); }
+
+	T& operator*() 	{return  member;}
+	T* operator->() {return &member;}
 };
 
 
-#define LALR_MAKE_SYMBOL_TYPE(Symbol, Class) \
-template<typename Iterator> \
-struct SymbolType<decltype(Symbol), Symbol, Iterator> \
-{ using Type = Class; }
-
-#define LALR_MAKE_SYMBOL(Index, Symbol) \
-template<> struct SymbolDef<Index> {static constexpr decltype(Symbol) Id = Symbol;};
-
-#define LALR_MAKE_RULE(Index, Symbol, SubSymbols...) \
-template<> struct RuleDef<Index> \
-{using Rule = Rule<decltype(Symbol), Symbol, SubSymbols>;};
-
-#define LALR_MAKE_STATE(Index, Actions...) \
-template<> struct StateDef<Index> {using State = State<Actions>;};
 
 
-#define LALR_MAKE_SHIFT_ACTION(Index, SymIndex)  ShiftAction<Index, SymIndex>
-#define LALR_MAKE_REDUCE_ACTION(Index, SymIndex) ReduceAction<Index, SymIndex>
-#define LALR_MAKE_GOTO_ACTION(Index, SymIndex) 	 GotoAction<Index, SymIndex>
-#define LALR_MAKE_ACCEPT_ACTION(Index, SymIndex) AcceptAction<Index, SymIndex>
+struct MyVariant
+{
+	std::unique_ptr<VariantFather> member;
+
+
+	template<int Id, typename ...Args>
+	void emplace(Args&&... args)
+	{
+		using type = Variant<typename SymbolType<Id>::type>;
+		member = std::make_unique<type>(std::forward<Args>(args)...);
+	}
+	template<int Id>
+	auto get() -> typename SymbolType<Id>::type&
+	{
+		auto p = dynamic_cast<typename SymbolType<Id>::type*>(member.get());
+		assert(p != nullptr);
+		return *p;
+	}
+	template<typename T>
+	T& get()
+	{
+		auto p = dynamic_cast<Variant<T>*>(member.get());
+
+		assert(p != nullptr);
+		return **p;
+	}
+	template<typename Id, typename ...Args>
+	MyVariant(Args&&... args) {emplace<Id>(std::forward<Args>(args)...);};
+	MyVariant() {member = std::make_unique<Variant<int>>(42);}
+	MyVariant(MyVariant&& rhs) noexcept = default;
+	MyVariant(const MyVariant& rhs) : member(rhs.member->clone())
+	{
+
+	}
+	~MyVariant() = default;
+
+	template<typename T> 	MyVariant(T && t)
+	{
+		member = std::make_unique<Variant<typename std::remove_reference<T>::type>>(std::forward<T>(t));
+	}
+
+	template<typename T>
+	MyVariant& operator=(T && t)
+	{
+		member = std::make_unique<Variant<typename std::remove_reference<T>::type>>(std::forward<T>(t));
+		return *this;
+	}
+
+};
+
+template<int Id>
+auto get(MyVariant &var) -> typename SymbolType<Id>::type&
+{
+	return var.get<Id>();
+}
+
+template<typename T>
+T& get(MyVariant &var)
+{
+	return var.get<T>();
+}
+
+#define LALR_MAKE_PARSER(RuleStart, RuleEnd) \
+template<typename Context_, typename Iterator>\
+struct Parser : StateMachine<Context_, MyVariant, Iterator> \
+{\
+	using Sm_t = StateMachine<Context_, MyVariant, Iterator>; \
+	using Token = typename Sm_t::Token;\
+	using Context = typename Sm_t::Context; \
+	using Stack = typename Sm_t::Stack;	\
+	using Sa = typename State<Context, Stack, Iterator>::StateAction;
+
+
+
+#define LALR_MAKE_SYMBOL_TOKEN(Id) \
+template<>	\
+struct SymbolType<Id>\
+{							\
+	using Type = Token;		\
+};
+
+#define LALR_MAKE_SYMBOL_TYPE(Id, Type) \
+template<>	\
+struct SymbolType<Id>\
+{							\
+	using Type = Type;		\
+};
+
+
+#define LALR_MAKE_TOKEN() TokenWrapper<Token>
+
+#define LALR_MAKE_RULE(Id, Name, SymId, SubSymbols...) \
+RuleImpl<Id, SymId, Context, Stack, SubSymbols> Name;
+
+#define LALR_MAKE_EMPTY_RULE(Id, Name, SymId) \
+RuleImpl<Id, SymId, Context, Stack> Name;
+
+#define LALR_MAKE_STATE(Id, Actions...) \
+State<Context, Stack, Iterator> State##Id {Id, { Actions }};
+
+#define LALR_MAKE_SHIFT_ACTION(Id, State_Id) Sa(Id, typename State<Context, Stack, Iterator>::Shift(State##State_Id))
+#define LALR_MAKE_REDUCE_ACTION(Id, Rule)	 Sa(Id, typename State<Context, Stack, Iterator>::Reduce(Rule))
+#define LALR_MAKE_GOTO_ACTION(Id, State_Id)  Sa(Id, typename State<Context, Stack, Iterator>::Goto(State##State_Id))
+#define LALR_MAKE_ACCEPT_ACTION(Id) 		 Sa(Id, typename State<Context, Stack, Iterator>::Accept())
 
 
 
