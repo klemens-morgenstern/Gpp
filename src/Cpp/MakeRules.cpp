@@ -61,13 +61,6 @@ string RuleMake::make_token_name(const wstring &in)
 
 void RuleMake::makeParser(const std::string& name, const std::string& ns, const std::string & path)
 {
-	stringstream rule_enum;
-
-	rule_enum << "#ifndef PARSER_RULES" << endl;
-	rule_enum << "#define PARSER_RULES\n" << endl;
-	rule_enum << "namespace " << ns << "{" << endl;
-	rule_enum << "enum class Rules \n{" << endl;
-
 	stringstream ss;
 
 	ss << "#ifndef PARSER_" << name << "_DEFS" << endl;
@@ -75,7 +68,6 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 
 	ss << "#include \"LALR.h\"" << endl;
 	ss << "#include \"Symbols.hpp\"" << endl;
-	ss << "#include \"Rules.hpp\"" << endl;
 	ss << "#include \"Actions.hpp\"" << endl;
 	ss << "#include \"SymbolTypes.hpp\"" << endl;
 	ss << "#include \"RuleActions.hpp\"" << endl << endl;
@@ -102,18 +94,42 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 		}
 		else if (s.second.Type == Egt::Symbol::Nonterminal)
 		{
-			ss << "LALR_MAKE_SYMBOL_TYPE(" << s.first << ", " << ns << "::SymbolTypes::" << make_token_name(s.second.Name) << ")" << endl;
+			auto nm = make_token_name(s.second.Name);
+			ss << "LALR_MAKE_SYMBOL_TYPE(" << s.first << ", " << ns << "::SymbolTypes::" << nm << ")" << endl;
 		}
 	}
 	ss << endl << endl;
 	///DEFINE the rule actions.
-	std::set<string> double_names; //to prevent double naming.
 
 	for (auto &r : f.Productions)
+	{
+		auto nms = make_token_name(f.SymbolTable.at(r.second.HeadIndex).Name);
+
+		ss << "LALR_DEFINE_RULE_ACTION("<< r.first << ", " << ns << "::RuleActions::" << nms << ");" << endl;
+	}
+
+	ss << "\n\n";
+
+	//START the mother
+	ss << "LALR_MAKE_PARSER(" << lower << ", " << upper << ")\n//{" << endl;
+
+	///Rules
+
+	ss << "\tstruct Rules\n\t{" << endl;
+
+	ss << "\t\tusing Token = typename Sm_t::Token;" << endl;
+	ss << "\t\tusing Context = typename Sm_t::Context;" << endl;
+	ss << "\t\tusing Stack = typename Sm_t::Stack;" << endl;
+
+	std::set<string> double_names;
+
+
+	for (auto & r : f.Productions)
 	{
 		auto &nm = f.SymbolTable.at(r.second.HeadIndex).Name;
 		auto nms = make_token_name(nm);
 		string name;
+
 		if (double_names.count(nms) != 0)
 		{
 			int i = 0;
@@ -130,42 +146,16 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 		}
 
 		RuleNames[r.first] = name;
-
-		ss << "LALR_DEFINE_RULE_ACTION_BEGIN(" << ns << "::Rules::" << name << ", " << ns << "::RuleActions::" << name << ");" << endl;
-	}
-
-	ss << "\n\n";
-
-	//START the mother
-	ss << "LALR_MAKE_PARSER(" << lower << ", " << upper << ")\n//{" << endl;
-
-	///Rules
-
-	ss << "\tstruct Rules\n\t{" << endl;
-
-	ss << "\t\tusing Token = typename Sm_t::Token;" << endl;
-	ss << "\t\tusing Context = typename Sm_t::Context;" << endl;
-	ss << "\t\tusing Stack = typename Sm_t::Stack;" << endl;
-
-	for (auto & r : f.Productions)
-	{
-
-
-		string name = RuleNames[r.first];
-		rule_enum << "\t" << name << " = " << r.first << ", \n";
-
-
 		if (r.second.Symbols .size() == 0)
 		{
-			ss << "\t\tLALR_MAKE_EMPTY_RULE(" //<<r.first
-					<< ns << "::Rules::" << name
+			ss << "\t\tLALR_MAKE_EMPTY_RULE(" << r.first
+
 					<< ", " << name << ", " << r.second.HeadIndex;
 		}
 		else
 		{
-			ss << "\t\tLALR_MAKE_RULE(" //<< r.first
-					<< ns << "::Rules::" << name
-					<< ", " << name<< ", " << r.second.HeadIndex;
+			ss << "\t\tLALR_MAKE_RULE(" << r.first
+					<< ", " << name << ", " << r.second.HeadIndex;
 			for (auto &s : r.second.Symbols)
 				ss << ", " << s;
 		}
@@ -207,8 +197,8 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 				break;
 			case Egt::LALRState::Goto:
 				ss << "LALR_MAKE_GOTO_ACTION(";
-				ss << ns << "::Symbols::" << sym;
-				ss << ", " << a.TargetIndex << ")";
+				ss << a.SymbolIndex << ", ";
+				ss << a.TargetIndex << ")";
 				break;
 			case Egt::LALRState::Accept:
 				ss << "LALR_MAKE_ACCEPT_ACTION(" << a.TargetIndex << ")";
@@ -234,11 +224,6 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 	ofstream fs(path + "/ParserDef.hpp");
 	fs << ss.rdbuf();
 
-	rule_enum << "};" << endl;
-	rule_enum << "}//" << ns << "\n#endif" << endl;
-
-	ofstream fs2(path + "/Rules.hpp");
-	fs2 << rule_enum.rdbuf();
 }
 
 void RuleMake::makeSymbolTypes(const std::string& name, const std::string& ns, const std::string & path)
@@ -273,50 +258,44 @@ void RuleMake::makeSymbolTypes(const std::string& name, const std::string& ns, c
 
 void RuleMake::makeRuleActions(const std::string& name, const std::string& ns, const std::string & path)
 {
+	using namespace std;
 	stringstream ss;  //used for predeclaration
 
 	ss << "#ifndef RULEACTION_DEFS" << endl;
-	ss << "#define RULEACTION_DEFS" << endl;
+	ss << "#define RULEACTION_DEFS" << endl << endl;
 
 	ss << "#include <boost/none.hpp>" << endl;
-	ss << "#include \"SymbolTypes.hpp\"" << endl;
+	ss << "#include \"SymbolTypes.hpp\"" << endl << endl;;
 
 	ss << "namespace " << ns << "\n{" << endl;
 	ss << "namespace RuleActionDef\n{\n" << endl;
 
 	ss << "using namespace " << ns << "::SymbolTypes;\n" << std::endl;
-	std::set<string> double_names; //to prevent double naming.
 
-//this loop collects the declaration and puts them into the stream
-	for (auto& r : f.Productions)
+
+	map<string, string> funcs;
+/*	for (auto& r : f.Productions)
 	{
 
-		auto &nm = f.SymbolTable.at(r.second.HeadIndex).Name;
-		auto nms = make_token_name(nm);
-		string name;
-		if (double_names.count(nms) != 0)
+		auto nm = make_token_name(f.SymbolTable.at(r.second.HeadIndex).Name);
+
+		if (funcs.count(nm) == 0)
 		{
-			int i = 0;
-			while (double_names.count(nms + std::to_string(i)) != 0) i++;
-
-			name = nms + std::to_string(i);
-			double_names.emplace(name);
-
+			ss << "struct " << nm << ";" << endl;
+			funcs[nm] = "";
 		}
-		else
-		{
-			name = nms;
-			double_names.emplace(name);
-		}
-
-		RuleNames[r.first] = name;
-		ss << "struct " << name << ";" << endl;
 	}
 
-	ss << endl;
+	ss << endl;*/
 
 	for (auto& r : f.Productions)
 	{
+		stringstream s_func;
+
+		auto nm = make_token_name(f.SymbolTable.at(r.second.HeadIndex).Name);
+		if (funcs.count(nm) == 0)
+			s_func << "\tusing Type = " << ns << "::SymbolTypes::" << make_token_name(f.SymbolTable.at(r.second.HeadIndex).Name) << ";\n\n";
+
 		stringstream s_args; //argument list
 		bool has_token = false;
 		for (auto s : r.second.Symbols)
@@ -333,19 +312,23 @@ void RuleMake::makeRuleActions(const std::string& name, const std::string& ns, c
 			}
 		}
 
-
-		ss << "struct " << RuleNames[r.first] << "\n{\n";
-
-		ss << "\tusing Type = " << ns << "::SymbolTypes::" << make_token_name(f.SymbolTable.at(r.second.HeadIndex).Name) << ";\n\n";
-
 		if (has_token)
-			ss << "\ttemplate<typename Context, typename Token>\n";
+			s_func << "\ttemplate<typename Context, typename Token>\n";
 		else
-			ss << "\ttemplate<typename Context>\n";
+			s_func << "\ttemplate<typename Context>\n";
 
-		ss << "\tstatic Type Action(Context& ctx" << s_args.str() << ")\n";
-		ss << "\t{\n\t\treturn Type();\n\t}" << endl;
+		s_func << "\tstatic Type Action(Context& ctx" << s_args.str() << ")\n";
+		s_func << "\t{\n\t\treturn Type();\n\t}\n" << endl;
+
+		funcs[nm] += s_func.str();
+	}
+
+	for (auto & p : funcs)
+	{
+		ss << "struct " << p.first << "\n{\n";
+		ss << p.second << endl;
 		ss << "};\n" << endl;
+
 	}
 
 

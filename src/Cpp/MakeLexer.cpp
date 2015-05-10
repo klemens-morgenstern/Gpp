@@ -110,13 +110,6 @@ void LexerMake::make_symbols(const std::string& name, const std::string& ns, con
 			symbol_names[s.first] = nm;
 			header << "\t\t" << nm << " = " << s.first /*i++*/  << ",\n";//" =  ~1,\n";
 		}
-		else if (type == Symbol::Nonterminal)
-		{
-			auto nm = "NonTerminal_" + make_token_name(s.second.Name);
-			symbol_names[s.first] = nm;
-			header << "\t\t" << nm << " = " << s.first /*i++*/  << ",\n";//" =  ~1,\n";
-		}
-
 	}
 	header << "\t};\n" << endl;
 

@@ -18,7 +18,6 @@
 #include <utility>
 #include <boost/ptr_container/ptr_vector.hpp>
 #include <memory>
-#include "demangle.h"
 #include <typeinfo>
 
 #include <iostream>
@@ -465,7 +464,7 @@ struct SymbolType<static_cast<int>(Id)> : Type_\
 };
 
 
-#define LALR_DEFINE_RULE_ACTION_BEGIN(Id, Type_)                \
+#define LALR_DEFINE_RULE_ACTION(Id, Type_)                \
 template<>                                                      \
 struct RuleAction<static_cast<int>(Id)> : Type_ 				\
 {                                                               \
