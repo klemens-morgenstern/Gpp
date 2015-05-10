@@ -42,6 +42,8 @@ enum Action_Enum
 	Error = 5, ///<Rule not recognized
 };
 
+struct token_tag {};
+
 template<int Id>
 struct SymbolType
 {
@@ -51,14 +53,28 @@ struct SymbolType
 
 struct MyVariant;
 
-template<int Id> 		auto get(MyVariant &var) -> typename SymbolType<Id>::type&;
-template<typename T>   T& get(MyVariant &var);
+template<int Id, 	 typename Token> 	auto get(MyVariant &var) -> typename SymbolType<Id>::type&;
+template<typename T, typename Token>   	  T& get(MyVariant &var);
+
+template<typename T, typename Token>
+struct getter
+{
+	static T& get(MyVariant& var);
+	using type = T;
+};
+
+template<typename Token>
+struct getter<token_tag, Token>
+{
+	static Token& get(MyVariant& var);
+	using type = Token;
+};
 
 struct NoRuleAction
 {
-	using result_type = boost::none_t;
+	using Type = boost::none_t;
 	template<typename ...Args>
-	static boost::none_t Action(Args...) {return boost::none;}
+	static boost::none_t Action(Args...){return boost::none;}
 
 };
 
@@ -74,7 +90,7 @@ struct TokenWrapper
 };
 
 
-template<typename Action_, typename Context, typename ...RuleObject>
+template<typename Action_, typename Token, typename Context, typename ...RuleObject>
 struct ExecuteRuleAction
 {
 	template<typename Stack>
@@ -102,15 +118,15 @@ struct ExecuteRuleAction
 		auto res = std::move(
 					Action_::Action(
 							ctx,
-							std::move(get<RuleObject>(args))...//TODO check if that works.
+							std::move(getter<RuleObject, Token>::get(args))...//TODO check if that works.
 					));
 		stack.emplace(std::move(res));
 	}
 
 };
 
-template<typename Context, typename ...RuleObject>
-struct ExecuteRuleAction<NoRuleAction, Context, RuleObject...>
+template<typename Token, typename Context, typename ...RuleObject>
+struct ExecuteRuleAction<NoRuleAction, Token, Context, RuleObject...>
 {
 	template<typename Stack>
 	static void Reduce(Context& ctx, Stack& stack)
@@ -124,7 +140,7 @@ struct ExecuteRuleAction<NoRuleAction, Context, RuleObject...>
 		Build(stack, std::integral_constant<size_t, Counter::value - 1>());
 	}
 	template<typename Stack>
-	static void Build(Stack& stack, std::integral_constant<size_t, 1>)
+	static void Build(Stack& stack, std::integral_constant<size_t, 0>)
 	{
 		stack.emplace(boost::none);
 	}
@@ -140,17 +156,18 @@ struct Rule
 	virtual ~Rule() = default;
 };
 
-template<int Id, int SymId, typename Context, typename Stack, int...RuleId>
+template<int Id, int SymId, typename Token, typename Context, typename Stack, int...RuleId>
 struct RuleImpl : Rule<Context, Stack>
 {
 	using Action = RuleAction<Id>;
 	using Type = typename SymbolType<SymId>::Type;
+	static_assert(std::is_convertible<typename Action::Type, Type>::value, "Actiontype must be convertible to symbol type");
 
 	RuleImpl() : Rule<Context, Stack>(SymId) {};
 	RuleImpl(const RuleImpl&) = default;
 	virtual int Reduce(Context& ctx, Stack &stack) override
 	{
-		ExecuteRuleAction<Action, Context,  typename SymbolType<RuleId>::Type...>::Reduce(ctx, stack);
+		ExecuteRuleAction<Action, Token, Context,  typename SymbolType<RuleId>::Type...>::Reduce(ctx, stack);
 		return sizeof...(RuleId);
 	}
 	virtual ~RuleImpl() = default;
@@ -380,17 +397,34 @@ struct MyVariant
 
 };
 
-template<int Id>
-auto get(MyVariant &var) -> typename SymbolType<Id>::type&
+
+template<typename T, typename Token>
+T& getter<T, Token>::get(MyVariant& var)
 {
-	return var.get<Id>();
+		return var.get<T>();
+};
+
+
+template<typename Token>
+Token& getter<token_tag, Token>::get(MyVariant& var)
+{
+	return var.get<Token>();
 }
 
-template<typename T>
-T& get(MyVariant &var)
+/*
+template<int Id, typename Token>
+auto get(MyVariant &var) -> typename getter<typename SymbolType<Id>::type, Token>::type&
 {
-	return var.get<T>();
+	return var.get<Id, Token>();
 }
+
+template<typename T, typename Token>
+auto get(MyVariant &var) -> typename getter<T, Token>::type&
+{
+	return getter<T, Token>::get(var);
+			//var.get<T, Token>();
+}
+*/
 
 #define LALR_MAKE_PARSER(RuleStart, RuleEnd) \
 template<typename Context_, typename Iterator>\
@@ -398,6 +432,7 @@ struct Parser : StateMachine<Context_, MyVariant, Iterator> \
 {\
 	using Sm_t = StateMachine<Context_, MyVariant, Iterator>; \
 	using Token = typename Sm_t::Token;\
+	using Symbol_t = typename Token::Symbol; \
 	using Context = typename Sm_t::Context; \
 	using Stack = typename Sm_t::Stack;	\
 	using Sa = typename State<Context, Stack, Iterator>::StateAction;
@@ -406,34 +441,49 @@ struct Parser : StateMachine<Context_, MyVariant, Iterator> \
 
 #define LALR_MAKE_SYMBOL_TOKEN(Id) \
 template<>	\
-struct SymbolType<Id>\
+struct SymbolType<static_cast<int>(Id)>\
 {							\
-	using Type = Token;		\
+	using Type = token_tag;		\
 };
 
-#define LALR_MAKE_SYMBOL_TYPE(Id, Type) \
+#define LALR_MAKE_SYMBOL_TYPE(Id, Type_) \
+namespace Gpp {		\
+namespace Lalr {	\
 template<>	\
-struct SymbolType<Id>\
+struct SymbolType<static_cast<int>(Id)>\
 {							\
-	using Type = Type;		\
-};
+	using Type = Type_;		\
+}; }}
+
+
+#define LALR_DEFINE_RULE_ACTION_BEGIN(Id, Type_)                                    \
+namespace Gpp {		\
+namespace Lalr {	\
+template<>                                                                         \
+struct RuleAction<static_cast<int>(Id)>                                                              \
+{                                                                                  \
+	using Type = Type_;                                                    		   \
+	template<typename Context>                                                     \
+	static Type Action
+
+#define LALR_DEFINE_RULE_ACTION_END() }; /*struct*/ } /*Lalr*/ } /*Gpp*/
 
 
 #define LALR_MAKE_TOKEN() TokenWrapper<Token>
 
 #define LALR_MAKE_RULE(Id, Name, SymId, SubSymbols...) \
-RuleImpl<Id, SymId, Context, Stack, SubSymbols> Name;
+RuleImpl<static_cast<int>(Id), SymId, Token, Context, Stack, SubSymbols> Name;
 
 #define LALR_MAKE_EMPTY_RULE(Id, Name, SymId) \
-RuleImpl<Id, SymId, Context, Stack> Name;
+RuleImpl<static_cast<int>(Id), SymId, Token, Context, Stack> Name;
 
 #define LALR_MAKE_STATE(Id, Actions...) \
 State<Context, Stack, Iterator> State##Id {Id, { Actions }};
 
-#define LALR_MAKE_SHIFT_ACTION(Id, State_Id) Sa(Id, typename State<Context, Stack, Iterator>::Shift(State##State_Id))
-#define LALR_MAKE_REDUCE_ACTION(Id, Rule)	 Sa(Id, typename State<Context, Stack, Iterator>::Reduce(Rule))
-#define LALR_MAKE_GOTO_ACTION(Id, State_Id)  Sa(Id, typename State<Context, Stack, Iterator>::Goto(State##State_Id))
-#define LALR_MAKE_ACCEPT_ACTION(Id) 		 Sa(Id, typename State<Context, Stack, Iterator>::Accept())
+#define LALR_MAKE_SHIFT_ACTION(Id, State_Id) Sa(static_cast<Symbol_t>(Id), typename State<Context, Stack, Iterator>::Shift(State##State_Id))
+#define LALR_MAKE_REDUCE_ACTION(Id, Rule)	 Sa(static_cast<Symbol_t>(Id), typename State<Context, Stack, Iterator>::Reduce(Rule))
+#define LALR_MAKE_GOTO_ACTION(Id, State_Id)  Sa(static_cast<Symbol_t>(Id), typename State<Context, Stack, Iterator>::Goto(State##State_Id))
+#define LALR_MAKE_ACCEPT_ACTION(Id) 		 Sa(static_cast<Symbol_t>(Id), typename State<Context, Stack, Iterator>::Accept())
 
 
 

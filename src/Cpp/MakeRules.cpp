@@ -59,6 +59,7 @@ string RuleMake::make_token_name(const wstring &in)
 
 void RuleMake::makeTree(const std::string& name, const std::string& ns, const std::string & path)
 {
+
 	stringstream ss;
 
 	ss << "#ifndef PARSER_" << name << "_TREE" << endl;
@@ -132,6 +133,13 @@ void RuleMake::makeTree(const std::string& name, const std::string& ns, const st
 
 void RuleMake::makeParser(const std::string& name, const std::string& ns, const std::string & path)
 {
+	stringstream rule_enum;
+
+	rule_enum << "#ifndef PARSER_RULES" << endl;
+	rule_enum << "#define PARSER_RULES\n" << endl;
+	rule_enum << "namespace " << ns << "{" << endl;
+	rule_enum << "enum class Rules \n{" << endl;
+
 	stringstream ss;
 
 	ss << "#ifndef PARSER_" << name << "_DEFS" << endl;
@@ -139,7 +147,9 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 
 	ss << "#include \"Tree.hpp\"" << endl;
 	ss << "#include \"LALR.h\"" << endl;
-	ss << "#include \"Symbols.hpp\"" << endl << endl;
+	ss << "#include \"Symbols.hpp\"" << endl;
+	ss << "#include \"Rules.hpp\"" << endl;
+	ss << "#include \"Actions.hpp\"" << endl << endl;
 
 
 
@@ -198,13 +208,20 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 
 		RuleNames[r.first] = name;
 
+		rule_enum << "\t" << name << " = " << r.first << ", \n";
+
+
 		if (r.second.Symbols .size() == 0)
 		{
-			ss << "\t\tLALR_MAKE_EMPTY_RULE(" << r.first << ", " << name << ", " << r.second.HeadIndex;
+			ss << "\t\tLALR_MAKE_EMPTY_RULE(" //<<r.first
+					<< ns << "::Rules::" << name
+					<< ", " << name << ", " << r.second.HeadIndex;
 		}
 		else
 		{
-			ss << "\t\tLALR_MAKE_RULE(" << r.first << ", " << name<< ", " << r.second.HeadIndex;
+			ss << "\t\tLALR_MAKE_RULE(" //<< r.first
+					<< ns << "::Rules::" << name
+					<< ", " << name<< ", " << r.second.HeadIndex;
 			for (auto &s : r.second.Symbols)
 				ss << ", " << s;
 		}
@@ -272,6 +289,12 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 
 	ofstream fs(path + "/ParserDef.hpp");
 	fs << ss.rdbuf();
+
+	rule_enum << "};" << endl;
+	rule_enum << "}//" << ns << "\n#endif" << endl;
+
+	ofstream fs2(path + "/Rules.hpp");
+	fs2 << rule_enum.rdbuf();
 }
 
 
