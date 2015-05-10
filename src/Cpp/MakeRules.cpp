@@ -14,6 +14,7 @@
 #include <boost/algorithm/string_regex.hpp>
 #include <boost/optional.hpp>
 #include <map>
+#include <unordered_map>
 
 #include <iostream>
 using namespace std;
@@ -273,7 +274,7 @@ void RuleMake::makeRuleActions(const std::string& name, const std::string& ns, c
 	ss << "using namespace " << ns << "::SymbolTypes;\n" << std::endl;
 
 
-	map<string, string> funcs;
+	unordered_map<string, string> funcs;
 /*	for (auto& r : f.Productions)
 	{
 
