@@ -18,6 +18,8 @@
 #include <utility>
 #include <boost/ptr_container/ptr_vector.hpp>
 #include <memory>
+#include "demangle.h"
+#include <typeinfo>
 
 #include <iostream>
 
@@ -362,6 +364,10 @@ struct MyVariant
 	auto get() -> typename SymbolType<Id>::type&
 	{
 		auto p = dynamic_cast<typename SymbolType<Id>::type*>(member.get());
+		if (p == nullptr)
+		{
+			std::cout << "Requested " << util::demangle(typeid(typename SymbolType<Id>::type).name()) << std::endl;
+		}
 		assert(p != nullptr);
 		return *p;
 	}
@@ -370,7 +376,12 @@ struct MyVariant
 	{
 		auto p = dynamic_cast<Variant<T>*>(member.get());
 
+		if (p == nullptr)
+		{
+			std::cout << "Requested " << util::demangle(typeid(T).name()) << std::endl;
+		}
 		assert(p != nullptr);
+
 		return **p;
 	}
 	template<typename Id, typename ...Args>
@@ -447,27 +458,18 @@ struct SymbolType<static_cast<int>(Id)>\
 };
 
 #define LALR_MAKE_SYMBOL_TYPE(Id, Type_) \
-namespace Gpp {		\
-namespace Lalr {	\
 template<>	\
-struct SymbolType<static_cast<int>(Id)>\
+struct SymbolType<static_cast<int>(Id)> : Type_\
 {							\
 	using Type = Type_;		\
-}; }}
+};
 
 
-#define LALR_DEFINE_RULE_ACTION_BEGIN(Id, Type_)                                    \
-namespace Gpp {		\
-namespace Lalr {	\
-template<>                                                                         \
-struct RuleAction<static_cast<int>(Id)>                                                              \
-{                                                                                  \
-	using Type = Type_;                                                    		   \
-	template<typename Context>                                                     \
-	static Type Action
-
-#define LALR_DEFINE_RULE_ACTION_END() }; /*struct*/ } /*Lalr*/ } /*Gpp*/
-
+#define LALR_DEFINE_RULE_ACTION_BEGIN(Id, Type_)                \
+template<>                                                      \
+struct RuleAction<static_cast<int>(Id)> : Type_ 				\
+{                                                               \
+};
 
 #define LALR_MAKE_TOKEN() TokenWrapper<Token>
 

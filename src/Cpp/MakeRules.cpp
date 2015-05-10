@@ -26,8 +26,10 @@ struct RuleMake
 	const Egt::File &f;
 	RuleMake(const Egt::File &f) : f(f) {};
 	static string make_token_name(const wstring &in);
-	void makeTree(const std::string& name, const std::string& ns, const std::string & path);
 	void makeParser(const std::string& name, const std::string& ns, const std::string & path);
+	void makeSymbolTypes(const std::string& name, const std::string& ns, const std::string & path);
+	void makeRuleActions(const std::string& name, const std::string& ns, const std::string & path);
+
 	static string make_symbol_name(const Egt::Symbol &sym)
 	{
 		if (sym.Type == Egt::Symbol::Nonterminal)
@@ -57,80 +59,6 @@ string RuleMake::make_token_name(const wstring &in)
 	return name;
 }
 
-void RuleMake::makeTree(const std::string& name, const std::string& ns, const std::string & path)
-{
-
-	stringstream ss;
-
-	ss << "#ifndef PARSER_" << name << "_TREE" << endl;
-	ss << "#define PARSER_" << name << "_TREE" << endl;
-
-	ss << "\n#include \"Token.hpp\"\n" << endl;
-	ss << "namespace Stubs\n{" << endl;
-	map<string, vector<Egt::Production>> mp;
-	for (auto & r : f.Productions)
-	{
-		auto nm = RuleMake::make_token_name(f.SymbolTable.at(r.second.HeadIndex).Name);
-
-		if (mp[nm].size() == 0)
-			ss << "struct " << nm << ";" << endl;
-		mp[nm].push_back(r.second);
-	}
-
-	ss << "}\n" <<endl;
-
-
-	ss << "namespace Tree \n{" << endl;
-	ss << "using namespace Stubs;" << endl;
-	ss << "} //Tree" << endl;
-
-	ss << "namespace Stubs \n{" << endl;
-
-	for (auto & r : mp)
-	{
-
-
-		auto nm = RuleMake::make_token_name(f.SymbolTable.at(r.second.front().HeadIndex).Name);
-		ss << "struct " << nm << "\n{" << endl;
-
-		ss << "\t" << nm << "() = default;" << endl;
-		ss << "\t" << nm << "(const " << nm <<  "&)  = default;" << endl;
-		ss << "\t" << nm << "(" <<		nm << "&&)  = default;\n" << endl;
-
-		for (auto & v : r.second)
-		{
-			if (v.Symbols.size() == 0) continue; //no argument, i.e. default constructor.
-			ss << "\t" << nm << "(const ";
-			for (auto itr = v.Symbols.begin(); itr != v.Symbols.end(); itr++)
-			{
-				if (itr != v.Symbols.begin())
-					ss << ", ";
-
-				auto sy = f.SymbolTable.at(*itr);
-
-				auto s = RuleMake::make_token_name(sy.Name);
-				if (sy.Type == Egt::Symbol::Nonterminal)
-					ss << "Tree::" << s << "& /* " << s << " */" ;
-				if (sy.Type == Egt::Symbol::Terminal)
-					ss << "Token " << "& /* " << s << " */";
-
-			}
-			ss << ") {}" << endl;
-		}
-		ss << "\n};" << endl;
-	}
-
-
-	ss << "} // Stubs\n" << endl;
-
-	ss << "#endif" << endl;
-
-	ofstream fs(path + "/Tree.hpp");
-
-	fs << ss.rdbuf();
-
-}
-
 void RuleMake::makeParser(const std::string& name, const std::string& ns, const std::string & path)
 {
 	stringstream rule_enum;
@@ -143,13 +71,14 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 	stringstream ss;
 
 	ss << "#ifndef PARSER_" << name << "_DEFS" << endl;
-	ss << "#define PARSER_" << name << "_DEFS" << endl;
+	ss << "#define PARSER_" << name << "_DEFS\n" << endl;
 
-	ss << "#include \"Tree.hpp\"" << endl;
 	ss << "#include \"LALR.h\"" << endl;
 	ss << "#include \"Symbols.hpp\"" << endl;
 	ss << "#include \"Rules.hpp\"" << endl;
-	ss << "#include \"Actions.hpp\"" << endl << endl;
+	ss << "#include \"Actions.hpp\"" << endl;
+	ss << "#include \"SymbolTypes.hpp\"" << endl;
+	ss << "#include \"RuleActions.hpp\"" << endl << endl;
 
 
 
@@ -171,22 +100,16 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 		{
 			ss << "LALR_MAKE_SYMBOL_TOKEN(" << s.first << ")" << endl;
 		}
+		else if (s.second.Type == Egt::Symbol::Nonterminal)
+		{
+			ss << "LALR_MAKE_SYMBOL_TYPE(" << s.first << ", " << ns << "::SymbolTypes::" << make_token_name(s.second.Name) << ")" << endl;
+		}
 	}
 	ss << endl << endl;
-
-	//START the mother
-	ss << "LALR_MAKE_PARSER(" << lower << ", " << upper << ")\n//{" << endl;
-
-	///Rules
-
-	ss << "\tstruct Rules\n\t{" << endl;
-
-	ss << "\t\tusing Token = typename Sm_t::Token;" << endl;
-	ss << "\t\tusing Context = typename Sm_t::Context;" << endl;
-	ss << "\t\tusing Stack = typename Sm_t::Stack;" << endl;
-
+	///DEFINE the rule actions.
 	std::set<string> double_names; //to prevent double naming.
-	for (auto & r : f.Productions)
+
+	for (auto &r : f.Productions)
 	{
 		auto &nm = f.SymbolTable.at(r.second.HeadIndex).Name;
 		auto nms = make_token_name(nm);
@@ -208,6 +131,27 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 
 		RuleNames[r.first] = name;
 
+		ss << "LALR_DEFINE_RULE_ACTION_BEGIN(" << ns << "::Rules::" << name << ", " << ns << "::RuleActions::" << name << ");" << endl;
+	}
+
+	ss << "\n\n";
+
+	//START the mother
+	ss << "LALR_MAKE_PARSER(" << lower << ", " << upper << ")\n//{" << endl;
+
+	///Rules
+
+	ss << "\tstruct Rules\n\t{" << endl;
+
+	ss << "\t\tusing Token = typename Sm_t::Token;" << endl;
+	ss << "\t\tusing Context = typename Sm_t::Context;" << endl;
+	ss << "\t\tusing Stack = typename Sm_t::Stack;" << endl;
+
+	for (auto & r : f.Productions)
+	{
+
+
+		string name = RuleNames[r.first];
 		rule_enum << "\t" << name << " = " << r.first << ", \n";
 
 
@@ -297,13 +241,131 @@ void RuleMake::makeParser(const std::string& name, const std::string& ns, const 
 	fs2 << rule_enum.rdbuf();
 }
 
+void RuleMake::makeSymbolTypes(const std::string& name, const std::string& ns, const std::string & path)
+{
+	stringstream ss;
+
+	ss << "#ifndef SYMBOLTYPE_DEFS" << endl;
+	ss << "#define SYMBOLTYPE_DEFS" << endl;
+
+	ss << "#include <boost/none.hpp>\n" << endl;
+
+	ss << "namespace " << ns << "\n{" << endl;
+	ss << "namespace SymbolTypeDef\n{\n" << endl;
+
+	for (auto& r : f.SymbolTable)
+	{
+		if (r.second.Type == Egt::Symbol::Nonterminal)
+		{
+			ss << "using " << make_token_name(r.second.Name) << " = boost::none_t;" << endl;
+		}
+	}
+
+
+	ss << "}" << endl;
+	ss << "namespace SymbolTypes\n{\n";
+	ss << "using namespace SymbolTypeDef;" << endl;
+	ss << "\n}\n}" << endl;
+	ss << "#endif" << endl;
+	ofstream fs(path + "/SymbolTypeDef.hpp");
+	fs << ss.rdbuf();
+}
+
+void RuleMake::makeRuleActions(const std::string& name, const std::string& ns, const std::string & path)
+{
+	stringstream ss;  //used for predeclaration
+
+	ss << "#ifndef RULEACTION_DEFS" << endl;
+	ss << "#define RULEACTION_DEFS" << endl;
+
+	ss << "#include <boost/none.hpp>" << endl;
+	ss << "#include \"SymbolTypes.hpp\"" << endl;
+
+	ss << "namespace " << ns << "\n{" << endl;
+	ss << "namespace RuleActionDef\n{\n" << endl;
+
+	ss << "using namespace " << ns << "::SymbolTypes;\n" << std::endl;
+	std::set<string> double_names; //to prevent double naming.
+
+//this loop collects the declaration and puts them into the stream
+	for (auto& r : f.Productions)
+	{
+
+		auto &nm = f.SymbolTable.at(r.second.HeadIndex).Name;
+		auto nms = make_token_name(nm);
+		string name;
+		if (double_names.count(nms) != 0)
+		{
+			int i = 0;
+			while (double_names.count(nms + std::to_string(i)) != 0) i++;
+
+			name = nms + std::to_string(i);
+			double_names.emplace(name);
+
+		}
+		else
+		{
+			name = nms;
+			double_names.emplace(name);
+		}
+
+		RuleNames[r.first] = name;
+		ss << "struct " << name << ";" << endl;
+	}
+
+	ss << endl;
+
+	for (auto& r : f.Productions)
+	{
+		stringstream s_args; //argument list
+		bool has_token = false;
+		for (auto s : r.second.Symbols)
+		{
+			auto sym = f.SymbolTable.at(s);
+			if (sym.Type == Egt::Symbol::Nonterminal)
+			{
+				s_args << ", " << ns << "::SymbolTypes::" << make_token_name(sym.Name) << "&& ";;
+			}
+			else
+			{
+				s_args << ", Token && /*" << make_token_name(sym.Name) << "*/";
+				has_token = true;
+			}
+		}
+
+
+		ss << "struct " << RuleNames[r.first] << "\n{\n";
+
+		ss << "\tusing Type = " << ns << "::SymbolTypes::" << make_token_name(f.SymbolTable.at(r.second.HeadIndex).Name) << ";\n\n";
+
+		if (has_token)
+			ss << "\ttemplate<typename Context, typename Token>\n";
+		else
+			ss << "\ttemplate<typename Context>\n";
+
+		ss << "\tstatic Type Action(Context& ctx" << s_args.str() << ")\n";
+		ss << "\t{\n\t\treturn Type();\n\t}" << endl;
+		ss << "};\n" << endl;
+	}
+
+
+	ss << "\n}" << endl;
+	ss << "namespace RuleActions  \n{\n";
+	ss << "using namespace RuleActionDef;" << endl;
+	ss << "\n}\n}" << endl;
+	ss << "#endif" << endl;
+	ofstream fs(path + "/RuleActionDef.hpp");
+	fs << ss.rdbuf();
+}
+
+
 
 void makeRules(const Egt::File &f, const std::string& name, const std::string& ns, const std::string & path)
 {
 	RuleMake lx(f);
-	lx.makeTree(name, ns, path);
 	lx.makeParser(name, ns, path);
-
+	lx.makeSymbolTypes(name, ns, path);
+	lx.makeRuleActions(name, ns, path);
 }
 
 } /* namespace Egt */
